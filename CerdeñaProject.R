@@ -1,11 +1,6 @@
 # Fritz Benedict C. Cerdeña | 2025 - 06390
-# CMSC 150 Project - Luzon Grid Dispatch
-#
 # Pipeline:  primal tableau (CSV)  ->  pick groups / CO2 toggle  ->  transpose + slack + Z
 #            ->  Simplex()  ->  Z, iterations, dispatch x_gt, prices S_t / h
-#
-# Run the test cases:   Rscript CerdeñaProject.R      (CSV must be in the working directory)
-
 install.packages("jsonlite")
 
 # CONSTANTS
