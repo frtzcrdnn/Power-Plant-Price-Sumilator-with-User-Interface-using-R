@@ -6,6 +6,7 @@
 #
 # Run the test cases:   Rscript CerdeñaProject.R      (CSV must be in the working directory)
 
+install.packages("jsonlite")
 
 # CONSTANTS
 CSV_PATH    <- "CMSC_150_-_Milestone_1_-_Primal_Tableau.csv" # primal tableau: ALL groups, CO2 cap ON (165,000)
@@ -207,9 +208,7 @@ basic_solution_min <- function(tableau){
     return(bs)
 }
 
-# ------------------------------------------------------------------------------
-# 5. ONE FUNCTION THAT DOES EVERYTHING (this is what the UI will call)
-# ------------------------------------------------------------------------------
+# UI calls this function for input validations
 validate_input <- function(selected_groups, co2_on, co2_cap){
     if (length(selected_groups) == 0) return("No plant group selected.")
     if (isTRUE(co2_on) && (is.null(co2_cap) || length(co2_cap) != 1 || is.na(suppressWarnings(as.numeric(co2_cap))) || as.numeric(co2_cap) <= 0))
@@ -217,7 +216,7 @@ validate_input <- function(selected_groups, co2_on, co2_cap){
     return(NULL)
 }
 
-solve_dispatch <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, primal = NULL, keepHistory = FALSE){
+solve_func <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, primal = NULL, keepHistory = FALSE){
     msg <- validate_input(selected_groups, co2_on, co2_cap)
     if (!is.null(msg)) return(list(status = "invalid", message = msg))
 
@@ -250,7 +249,7 @@ solve_dispatch <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, pri
         out$final_tableau <- res$finalTableau
     }
     if (keepHistory) out$history <- res$history
-    out
+    return(out)
 }
 
 # ------------------------------------------------------------------------------
@@ -258,6 +257,9 @@ solve_dispatch <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, pri
 #    install.packages("jsonlite"); it is only used to write JSON, not to optimize anything)
 #    digits = NA keeps full precision (the default of 4 decimals would damage Z and the prices)
 # ------------------------------------------------------------------------------
+
+# pass to next.js as .json (install.packages("jsonlite"))
+# retains digits = NA for precision
 result_to_json <- function(res, include_history = FALSE){
     if (!requireNamespace("jsonlite", quietly = TRUE)) stop("Install jsonlite: install.packages(\"jsonlite\")")
     keep <- c("status", "message", "groups", "co2_on", "co2_cap", "num_unknowns", "num_constraints", "iterations", "Z", "check_sum_bS")
@@ -278,12 +280,10 @@ result_to_json <- function(res, include_history = FALSE){
             tableau   = unname(h$tableau),                              # array of rows
             basic_solution = as.list(basic_solution_min(h$tableau))))
     }
-    jsonlite::toJSON(payload, auto_unbox = TRUE, digits = NA, na = "null", pretty = FALSE)
+    return(jsonlite::toJSON(payload, auto_unbox = TRUE, digits = NA, na = "null", pretty = FALSE))
 }
 
-# ------------------------------------------------------------------------------
-# 7. TEST CASES from the Project Specs
-# ------------------------------------------------------------------------------
+# prints test cases
 print_result <- function(name, res){
     cat("=====", name, "=====\n")
     cat("Plant groups :", paste(res$groups, collapse = ", "), "\n")
@@ -306,7 +306,7 @@ check_case <- function(case, res){
                     abs(res$check_sum_bS - res$Z) / res$Z < 1e-9
     }
     cat(if (ok) "PASS" else "FAIL", "-", case$name, "\n\n")
-    ok
+    return(ok)
 }
 
 TEST_CASES <- list(
@@ -332,6 +332,6 @@ if (sys.nframe() == 0){ # only runs with `Rscript CerdeñaProject_CSV.R`, not wh
     cat(passed, "of", length(TEST_CASES), "test cases passed\n")
 
     cat("\n--- Invalid input examples ---\n")
-    print_result("No group selected", c(solve_dispatch(character(0), TRUE, 165000, primal), list(groups = "none")))
-    print_result("CO2 cap of 0",      c(solve_dispatch("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
+    print_result("No group selected", c(solve_func(character(0), TRUE, 165000, primal), list(groups = "none")))
+    print_result("CO2 cap of 0",      c(solve_func("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
 }
