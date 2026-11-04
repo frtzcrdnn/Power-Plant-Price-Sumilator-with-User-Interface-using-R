@@ -1,10 +1,10 @@
 # Fritz Benedict C. Cerdeña | 2025 - 06390
 # Pipeline:  primal tableau (CSV)  ->  pick groups / CO2 toggle  ->  transpose + slack + Z
 #            ->  Simplex()  ->  Z, iterations, dispatch x_gt, prices S_t / h
-install.packages("jsonlite")
+# install.packages("jsonlite")
 
 # CONSTANTS
-CSV_PATH    <- "CMSC_150_-_Milestone_1_-_Primal_Tableau.csv" # primal tableau: ALL groups, CO2 cap ON (165,000)
+CSV_PATH    <- "Primal.csv" # primal tableau: ALL groups, CO2 cap ON (165,000)
 BLOCK_HOURS <- 4                                              # h: hours per block (prices = S_t / h)
 N_BLOCKS    <- 6
 
@@ -247,16 +247,10 @@ solve_func <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, primal 
     return(out)
 }
 
-# ------------------------------------------------------------------------------
-# 6. HAND-OFF TO NEXT.JS: turn the result into JSON  (needs the jsonlite package:
-#    install.packages("jsonlite"); it is only used to write JSON, not to optimize anything)
-#    digits = NA keeps full precision (the default of 4 decimals would damage Z and the prices)
-# ------------------------------------------------------------------------------
-
 # pass to next.js as .json (install.packages("jsonlite"))
 # retains digits = NA for precision
 result_to_json <- function(res, include_history = FALSE){
-    if (!requireNamespace("jsonlite", quietly = TRUE)) stop("Install jsonlite: install.packages(\"jsonlite\")")
+    # if (!requireNamespace("jsonlite", quietly = TRUE)) stop("Install jsonlite: install.packages(\"jsonlite\")")
     keep <- c("status", "message", "groups", "co2_on", "co2_cap", "num_unknowns", "num_constraints", "iterations", "Z", "check_sum_bS")
     payload <- res[intersect(keep, names(res))]
     if (!is.null(res$dispatch)){
@@ -271,7 +265,7 @@ result_to_json <- function(res, include_history = FALSE){
         payload$history <- lapply(res$history, function(h) list(
             iteration = h$iteration,
             pivotRow  = if (is.na(h$pivotRow)) NA_integer_ else as.integer(h$pivotRow),   # 1-based; null when there is no pivot
-            pivotCol  = if (is.na(h$pivotCol)) NA_integer_ else as.integer(h$pivotCol),
+            pivotCol  = if (is.na(h$pivotCol)) NA_integer_ else as.integer(h$pivotCol),   # same thing
             tableau   = unname(h$tableau),                              # array of rows
             basic_solution = as.list(basic_solution_min(h$tableau))))
     }
@@ -315,7 +309,7 @@ TEST_CASES <- list(
          co2_on = TRUE, co2_cap = 165000, status = "infeasible", iterations = 37)
 )
 
-if (sys.nframe() == 0){ # only runs with `Rscript CerdeñaProject_CSV.R`, not when this file is source()d
+if (sys.nframe() == 0){ # only runs with `Rscript CerdeñaProject.R`, not when this file is source()d
     primal <- read_primal_csv(CSV_PATH)
     cat("CSV read:", nrow(primal$A), "constraints x", ncol(primal$A), "unknowns\n\n")
     passed <- 0
