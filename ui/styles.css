@@ -223,13 +223,13 @@ body {
 .alert-box.ok {
   background: #e9f8ef;
   border-color: #a8dfbd;
-  color: #14532d;
+  color: #079841;
 }
 
 .alert-box.bad {
   background: #fdecec;
   border-color: #f3b4b4;
-  color: #7f1d1d;
+  color: #ac2626;
 }
 
 .alert-box.warn {

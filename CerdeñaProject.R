@@ -481,7 +481,7 @@ server <- function(input, output, session){
                  h4("Welcome!"),
                  tags$ol(
                    tags$li("Tick the plant groups that are available (or press Check All)."),
-                   tags$li("(Optional) Switch on the CO\u2082 cap and edit its limit."),
+                   tags$li("Switch on the CO\u2082 cap and edit its limit. (Optional)"),
                    tags$li("Press ", tags$b("SOLVE"), ".")),
                  p(class = "muted", "You will get the minimum daily cost, the output of every plant in every 4-hour block, and the price of electricity in each block. ",
                    "The ", tags$b("Simplex Tableau"), " tab lets you see every iteration.")))
@@ -509,7 +509,7 @@ server <- function(input, output, session){
       div(class = "metrics",
           metric_card("Total minimum cost, Z", paste0(PESO, fmt_fixed(res$Z)), "for one day", "main"),
           metric_card("Iterations", res$iterations),
-          metric_card("Unknowns", res$num_unknowns, "x\u2099\u209c variables"),
+          metric_card("Unknowns", res$num_unknowns, "x\u2099\u209c variables"), # Xnt variables
           metric_card("Constraints", res$num_constraints)),
       div(class = "card-lite", h4("Output of each plant group", tags$small("x", tags$sub("gt"), " in MW")), dispatch_html(res$dispatch)),
       div(class = "card-lite", h4("Price of electricity", tags$small("by block, ", PESO, " per MWh")), prices_html(res$prices)),
