@@ -308,9 +308,8 @@ BLOCK_LABELS <- c("12\u20134 AM", "4\u20138 AM", "8 AM\u201312 NN", "12\u20134 P
 # trims trailing zeros: 7000.00 -> "7,000" ; 4540.909 -> "4,540.91"
 fmt_num <- function(x, digits = 2){
   x   <- ifelse(abs(x) < 1e-9, 0, x)
-  out <- formatC(x, format = "f", digits = digits, big.mark = ",")
-  out <- ifelse(grepl("\\.", out), sub("\\.?0+$", "", out), out)
-  out[out %in% c("-0", "")] <- "0"
+  out <- formatC(x, format = "f", digits = digits, big.mark = ",") # 123456.789 -> 123,456.79
+  out[out %in% c("-0", "")] <- "0" # rounding sometimes cause -0, turns to 0
   return(out)
 }
 # always 2 decimals: 3800 -> "3,800.00"
@@ -329,7 +328,7 @@ metric_card <- function(label, value, sub = NULL, cls = ""){
 }
 
 # shared table wrapper: the markup lives in custom_table.html, R only fills the placeholders
-#   style = inline CSS for the scroll box, thead / tbody = the <tr> rows (HTML strings)
+# style = inline CSS for the scroll box, thead / tbody = the <tr> rows (HTML strings)
 table_component <- function(thead, tbody, maxh = NULL){
   htmlTemplate("ui/custom_table.html",
                style = HTML(if (is.null(maxh)) "" else paste0("max-height:", maxh, "px")),
@@ -420,7 +419,7 @@ ui <- fluidPage(
                                           p(class = "co2-note", "Default 165,000 t. Must be greater than 0."))),
                      div(class = "card-lite",
                          h4(span(class = "step-no", "3"), "Solve"),
-                         actionButton("solve", HTML("Find cheapest dispatch")),
+                         actionButton("solve", HTML("SOLVE")),
                          hr(style = "margin:14px 0 8px"),
                          p(class = "muted", style = "font-size:12.5px; margin:0 0 6px", "Quick-load a sample case (then press Solve):"),
                          div(class = "btn-row test-row",
@@ -479,13 +478,13 @@ server <- function(input, output, session){
     res <- rv$res
     if (is.null(res)){
       return(div(class = "card-lite welcome",
-                 h4("Welcome"),
+                 h4("Welcome!"),
                  tags$ol(
-                   tags$li("Tick the plant groups that are available (or press ", tags$b("Check All"), ")."),
-                   tags$li("Optionally switch on the CO\u2082 cap and edit its limit."),
-                   tags$li("Press ", tags$b("Find cheapest dispatch"), ".")),
+                   tags$li("Tick the plant groups that are available (or press Check All)."),
+                   tags$li("(Optional) Switch on the CO\u2082 cap and edit its limit."),
+                   tags$li("Press ", tags$b("SOLVE"), ".")),
                  p(class = "muted", "You will get the minimum daily cost, the output of every plant in every 4-hour block, and the price of electricity in each block. ",
-                   "The ", tags$b("Simplex Tableau"), " tab lets you step through every iteration.")))
+                   "The ", tags$b("Simplex Tableau"), " tab lets you see every iteration.")))
     }
     if (res$status == "invalid") return(alert_box("warn", "Invalid input", res$message))
     if (res$status == "error")   return(alert_box("bad", "Unable to solve", res$message))
