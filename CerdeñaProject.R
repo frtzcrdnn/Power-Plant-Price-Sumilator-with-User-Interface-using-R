@@ -304,7 +304,7 @@ GROUP_CAP    <- c("Coal" = 7000, "Natural Gas" = 3300, "Geothermal" = 800, "Hydr
                   "Oil-based" = 1500, "Solar" = 2500, "Wind" = 400)
 BLOCK_LABELS <- c("12\u20134 AM", "4\u20138 AM", "8 AM\u201312 NN", "12\u20134 PM", "4\u20138 PM", "8 PM\u201312 MN")
 
-# ---- number formatting ------------------------------------------------------------
+# NUMBER FORMATTING
 # trims trailing zeros: 7000.00 -> "7,000" ; 4540.909 -> "4,540.91"
 fmt_num <- function(x, digits = 2){
   x   <- ifelse(abs(x) < 1e-9, 0, x)
