@@ -1,7 +1,13 @@
 # Fritz Benedict C. Cerdeña | 2025 - 06390
+
 # Pipeline:  primal tableau (CSV)  ->  pick groups / CO2 toggle  ->  transpose + slack + Z
-#            ->  Simplex()  ->  Z, iterations, dispatch x_gt, prices S_t / h
-# install.packages("jsonlite")
+# ->  Simplex()  ->  Z, iterations, dispatch x_gt, prices S_t / h   ->  R Shiny UI
+
+# NEEDS: 
+# 1) install.packages("shiny")
+# 2) "Primal.csv" in the same folder
+
+library(shiny)
 
 # CONSTANTS
 CSV_PATH    <- "Primal.csv" # primal tableau: ALL groups, CO2 cap ON (165,000)
@@ -14,115 +20,115 @@ GROUP_KEYS <- c("Coal" = "Coal", "Natural Gas" = "NatGas", "Geothermal" = "Geo",
 
 # keepHistory = TRUE also returns $history: the tableau of every iteration, defaults to FALSE
 Simplex <- function(tableau, isMax, keepHistory = FALSE){
-    numRows <- nrow(tableau)
-    numCols <- ncol(tableau)
-    tol <- 1e-8 # for handling near 0 values
-
-    iterations <- 0 # count pivots
-    # ADDED: For project specifications, infeasible is needed
-    infeasible <- FALSE 
-    history <- list() # NEW: tableau of every iteration (only filled when keepHistory = TRUE)
-    while(TRUE){
-        bottomRow <- tableau[numRows, 1:(numCols - 1)] # gets the bottom row, from first column to the 2nd last column
-
-        # checks if there are no more negative numbers left; end the loop
-        if (!any(bottomRow < -tol)){
-            if (keepHistory) history[[length(history) + 1]] <- list(iteration = iterations, pivotRow = NA, pivotCol = NA, tableau = tableau) # NEW: final tableau
-            break
-        }
-
-        minVal <- min(bottomRow)
-        pivotCol <- which(abs(bottomRow - minVal) < tol)[1] # returns which column is equal to the minimum value
-
-        validRows <- c()    
-        testRatios <- c()
-
-        # get all the test ratios
-        for (i in 1:(numRows - 1)){ # loops through all rows except for bottom row
-            b <- tableau[i, pivotCol]
-            if (b > tol){ # checks if positive, and not dividing by 0
-                a <- tableau[i, numCols]
-                tr <- a/b
-                validRows <- c(validRows, i) # stores the row index if the row is valid as pivot row
-                testRatios <- c(testRatios, tr) # stores the test ratios for later
-            }
-        }
-
-        # if no valid pivot rows
-        if (length(validRows) == 0){
-            infeasible <- TRUE
-            if (keepHistory) history[[length(history) + 1]] <- list(iteration = iterations, pivotRow = NA, pivotCol = pivotCol, tableau = tableau) # NEW
-            break
-        }
-
-        # get the smallest test ratio
-        minTr <- min(testRatios)
-        pivotRow <- validRows[which(abs(testRatios - minTr) < tol)][1] # checks which of the testratios would result in a difference of 0
-        PivotElement <- tableau[pivotRow, pivotCol]
-
-        if (keepHistory) history[[length(history) + 1]] <- list(iteration = iterations, pivotRow = pivotRow, pivotCol = pivotCol, tableau = tableau) # NEW: state BEFORE this pivot
-        iterations <- iterations + 1
-        # (gauss-jordan / row normalization) and then elimination/update
-        tableau[pivotRow, ] <- tableau[pivotRow, ] / PivotElement # nPR = PR/PE
-        for (i in 1:numRows){
-            if (i != pivotRow){
-                C <- tableau[i, pivotCol] # value to eliminate
-                tableau[i, ] <- tableau[i, ] - (tableau[pivotRow, ] * C) # Rn = Rn - (nPR * C)
-            }
-        }
+  numRows <- nrow(tableau)
+  numCols <- ncol(tableau)
+  tol <- 1e-8 # for handling near 0 values
+  
+  iterations <- 0 # count pivots
+  # ADDED: For project specifications, infeasible is needed
+  infeasible <- FALSE 
+  history <- list() # NEW: tableau of every iteration (only filled when keepHistory = TRUE)
+  while(TRUE){
+    bottomRow <- tableau[numRows, 1:(numCols - 1)] # gets the bottom row, from first column to the 2nd last column
+    
+    # checks if there are no more negative numbers left; end the loop
+    if (!any(bottomRow < -tol)){
+      if (keepHistory) history[[length(history) + 1]] <- list(iteration = iterations, pivotRow = NA, pivotCol = NA, tableau = tableau) # NEW: final tableau
+      break
     }
-
-    finalTableau <- tableau
-    Z <- unname(tableau[numRows, numCols]) # unname() removes the col/row names
-    colNames <- colnames(tableau) # gets the column names from tableau
-    variables <- colNames[1:(numCols - 1)] # -1 since sobra ng isa
-
-    # if we are finding the maximum
-    if(isMax){
-        basicSolution <- numeric(numCols - 1)
-        names(basicSolution) <- variables
-        for (i in 1:(numCols - 1)){ # loops through all columns except the solution column
-            colVals <- tableau[, i]
-            nonZeroRows <- which(abs(colVals) > tol) # saves rows indexes in which the value is not 0
-            if (length(nonZeroRows) == 1 && abs(colVals[nonZeroRows] - 1) < tol){ # verifies if there is only 1 nonzero per column, and ensures that it is 1
-                basicSolution[i] <- tableau[nonZeroRows, numCols] / tableau[nonZeroRows, i] # assigns it to the basic solutions
-            }else{
-                basicSolution[i] <- 0 # if there are more than 1 nonzero in the column, assign 0 to the basic solution
-            }
-        }
-    }else{ # if finding minimum
-        # the basic solution is already right at the bottom row
-        basicSolution <- tableau[numRows, 1:(numCols - 1)]
-        names(basicSolution) <- variables
-        basicSolution[length(basicSolution)] <- Z
+    
+    minVal <- min(bottomRow)
+    pivotCol <- which(abs(bottomRow - minVal) < tol)[1] # returns which column is equal to the minimum value
+    
+    validRows <- c()    
+    testRatios <- c()
+    
+    # get all the test ratios
+    for (i in 1:(numRows - 1)){ # loops through all rows except for bottom row
+      b <- tableau[i, pivotCol]
+      if (b > tol){ # checks if positive, and not dividing by 0
+        a <- tableau[i, numCols]
+        tr <- a/b
+        validRows <- c(validRows, i) # stores the row index if the row is valid as pivot row
+        testRatios <- c(testRatios, tr) # stores the test ratios for later
+      }
     }
-
-    return(list(finalTableau = finalTableau, basicSolution = basicSolution, Z = Z, iterations = iterations, infeasible = infeasible, history = history))
+    
+    # if no valid pivot rows
+    if (length(validRows) == 0){
+      infeasible <- TRUE
+      if (keepHistory) history[[length(history) + 1]] <- list(iteration = iterations, pivotRow = NA, pivotCol = pivotCol, tableau = tableau) # NEW
+      break
+    }
+    
+    # get the smallest test ratio
+    minTr <- min(testRatios)
+    pivotRow <- validRows[which(abs(testRatios - minTr) < tol)][1] # checks which of the testratios would result in a difference of 0
+    PivotElement <- tableau[pivotRow, pivotCol]
+    
+    if (keepHistory) history[[length(history) + 1]] <- list(iteration = iterations, pivotRow = pivotRow, pivotCol = pivotCol, tableau = tableau) # NEW: state BEFORE this pivot
+    iterations <- iterations + 1
+    # (gauss-jordan / row normalization) and then elimination/update
+    tableau[pivotRow, ] <- tableau[pivotRow, ] / PivotElement # nPR = PR/PE
+    for (i in 1:numRows){
+      if (i != pivotRow){
+        C <- tableau[i, pivotCol] # value to eliminate
+        tableau[i, ] <- tableau[i, ] - (tableau[pivotRow, ] * C) # Rn = Rn - (nPR * C)
+      }
+    }
+  }
+  
+  finalTableau <- tableau
+  Z <- unname(tableau[numRows, numCols]) # unname() removes the col/row names
+  colNames <- colnames(tableau) # gets the column names from tableau
+  variables <- colNames[1:(numCols - 1)] # -1 since sobra ng isa
+  
+  # if we are finding the maximum
+  if(isMax){
+    basicSolution <- numeric(numCols - 1)
+    names(basicSolution) <- variables
+    for (i in 1:(numCols - 1)){ # loops through all columns except the solution column
+      colVals <- tableau[, i]
+      nonZeroRows <- which(abs(colVals) > tol) # saves rows indexes in which the value is not 0
+      if (length(nonZeroRows) == 1 && abs(colVals[nonZeroRows] - 1) < tol){ # verifies if there is only 1 nonzero per column, and ensures that it is 1
+        basicSolution[i] <- tableau[nonZeroRows, numCols] / tableau[nonZeroRows, i] # assigns it to the basic solutions
+      }else{
+        basicSolution[i] <- 0 # if there are more than 1 nonzero in the column, assign 0 to the basic solution
+      }
+    }
+  }else{ # if finding minimum
+    # the basic solution is already right at the bottom row
+    basicSolution <- tableau[numRows, 1:(numCols - 1)]
+    names(basicSolution) <- variables
+    basicSolution[length(basicSolution)] <- Z
+  }
+  
+  return(list(finalTableau = finalTableau, basicSolution = basicSolution, Z = Z, iterations = iterations, infeasible = infeasible, history = history))
 }
 
 
 # Reads the Primal Tableau from CSV File to be used in building the initial tableau
 read_primal_csv <- function(path = CSV_PATH){
-    if (!file.exists(path)) stop("Cannot find the primal tableau CSV: ", path)
-    
-    # reads the .csv file and converts to M matrix in R
-    # https://stat.ethz.ch/R-manual/R-devel/library/utils/html/read.table.html
-    df <- read.csv(path, row.names = 1, check.names = FALSE, stringsAsFactors = FALSE)
-    M  <- as.matrix(df)
-
-    # input validations
-    if (!is.numeric(M) || anyNA(M)) stop("The CSV must contain only numbers (besides row/column names).")
-    if (tolower(rownames(M)[nrow(M)]) != "objective") stop("The last row of the CSV must be the Objective row.")
-    if (tolower(colnames(M)[ncol(M)]) != "rhs") stop("The last column of the CSV must be RHS.")
-
-    var_names <- colnames(M)[-ncol(M)]
-    # https://shiny.abdn.ac.uk/Stats/tutorials/R_Intermediate/R_Intermediate_P1/matrix-subsetting.html
-    list(A = M[-nrow(M), -ncol(M), drop = FALSE],   # constraint coefficients
-         b = M[-nrow(M), ncol(M)],                  # RHS of the constraints
-         c = M[nrow(M), -ncol(M)],                  # objective row (h * c_gt)
-         var_names = var_names,
-         row_names = rownames(M)[-nrow(M)],
-         groups    = unique(sub("_B[0-9]+$", "", var_names))) # extract sub-groups (unique), (Coal_B1 etc. --> Coal)
+  if (!file.exists(path)) stop("Cannot find the primal tableau CSV: ", path)
+  
+  # reads the .csv file and converts to M matrix in R
+  # https://stat.ethz.ch/R-manual/R-devel/library/utils/html/read.table.html
+  df <- read.csv(path, row.names = 1, check.names = FALSE, stringsAsFactors = FALSE)
+  M  <- as.matrix(df)
+  
+  # input validations
+  if (!is.numeric(M) || anyNA(M)) stop("The CSV must contain only numbers (besides row/column names).")
+  if (tolower(rownames(M)[nrow(M)]) != "objective") stop("The last row of the CSV must be the Objective row.")
+  if (tolower(colnames(M)[ncol(M)]) != "rhs") stop("The last column of the CSV must be RHS.")
+  
+  var_names <- colnames(M)[-ncol(M)]
+  # https://shiny.abdn.ac.uk/Stats/tutorials/R_Intermediate/R_Intermediate_P1/matrix-subsetting.html
+  list(A = M[-nrow(M), -ncol(M), drop = FALSE],   # constraint coefficients
+       b = M[-nrow(M), ncol(M)],                  # RHS of the constraints
+       c = M[nrow(M), -ncol(M)],                  # objective row (h * c_gt)
+       var_names = var_names,
+       row_names = rownames(M)[-nrow(M)],
+       groups    = unique(sub("_B[0-9]+$", "", var_names))) # extract sub-groups (unique), (Coal_B1 etc. --> Coal)
 }
 
 # CSV prefix -> display name (what the UI and the tables show)
@@ -130,10 +136,10 @@ display_name <- function(keys) unname(ifelse(keys %in% GROUP_KEYS, names(GROUP_K
 
 # accepts display names ("Natural Gas") or CSV prefixes ("NatGas")
 resolve_groups <- function(selected_groups, available){
-    keys <- ifelse(selected_groups %in% names(GROUP_KEYS), GROUP_KEYS[selected_groups], selected_groups) # specifically used ifelse for vectors
-    unknown <- setdiff(keys, available) # var_names present in keys but not in available are assigned to unknown var_names
-    if (length(unknown) > 0) stop("Unknown plant group: ", paste(unknown, collapse = ", "))
-    return(unname(keys))
+  keys <- ifelse(selected_groups %in% names(GROUP_KEYS), GROUP_KEYS[selected_groups], selected_groups) # specifically used ifelse for vectors
+  unknown <- setdiff(keys, available) # var_names present in keys but not in available are assigned to unknown var_names
+  if (length(unknown) > 0) stop("Unknown plant group: ", paste(unknown, collapse = ", "))
+  return(unname(keys))
 }
 
 
@@ -142,185 +148,570 @@ resolve_groups <- function(selected_groups, available){
 # - toggle setting for CO2_Cap ON/OFF
 # - remove rows that are now zeroes
 build_initial_tableau <- function(primal, selected_groups, co2_on = TRUE, co2_cap = 165000){
-    keys <- resolve_groups(selected_groups, primal$groups)
-
-    # columns of the selected groups only (keeps the CSV order, not the order the user clicked)
-    # RegEx used: https://search.r-project.org/R/refmans/base/html/regex.html
-    keep_cols <- sub("_B[0-9]+$", "", primal$var_names) %in% keys # sub replaces all matches 
-    A         <- primal$A[, keep_cols, drop = FALSE]
-    C_primal  <- primal$c[keep_cols]
-    var_names <- primal$var_names[keep_cols]
-    b_vals    <- primal$b
-    row_names <- primal$row_names
-
-    # if CO2 cap OFF -> drop the row, else ON -> use the limit typed by the user
-    is_co2 <- row_names == "CO2_Cap"
-    keep_rows <- rep(TRUE, length(row_names))
-    if (co2_on) b_vals[is_co2] <- -co2_cap else keep_rows[is_co2] <- FALSE
-
-    # drop constraints that belong only to removed groups that are all zeros
-    keep_rows <- keep_rows & (rowSums(abs(A)) > 0)
-    A         <- A[keep_rows, , drop = FALSE]
-    b_vals    <- unname(b_vals[keep_rows])
-    row_names <- row_names[keep_rows]
-
-    num_vars        <- ncol(A)  # n
-    num_constraints <- nrow(A)  # m
-
-    # [ A^T | I_n | 0_z | C_primal ]
-    top_block  <- cbind(t(A), diag(num_vars), matrix(0, num_vars, 1), matrix(C_primal, num_vars, 1))
-    # [ -b_primal | 0_slack | 1_z | 0_sol ]
-    bottom_row <- c(-b_vals, numeric(num_vars), 1, 0)
-
-    initial_tableau <- rbind(top_block, bottom_row)
-
-    # descriptive names: S1_Demand_B1 ... | Coal_B1 ... (slack = the original unknown) | Z | Solution
-    colnames(initial_tableau) <- c(paste0("S", 1:num_constraints, "_", row_names), var_names, "Z", "Solution")
-    rownames(initial_tableau) <- c(var_names, "Z")
-
-    return(list(tableau = initial_tableau, m = num_constraints, n = num_vars, b = b_vals, constraint_names = row_names, var_names = var_names, groups = keys))
+  keys <- resolve_groups(selected_groups, primal$groups)
+  
+  # columns of the selected groups only (keeps the CSV order, not the order the user clicked)
+  # RegEx used: https://search.r-project.org/R/refmans/base/html/regex.html
+  keep_cols <- sub("_B[0-9]+$", "", primal$var_names) %in% keys # sub replaces all matches 
+  A         <- primal$A[, keep_cols, drop = FALSE]
+  C_primal  <- primal$c[keep_cols]
+  var_names <- primal$var_names[keep_cols]
+  b_vals    <- primal$b
+  row_names <- primal$row_names
+  
+  # if CO2 cap OFF -> drop the row, else ON -> use the limit typed by the user
+  is_co2 <- row_names == "CO2_Cap"
+  keep_rows <- rep(TRUE, length(row_names))
+  if (co2_on) b_vals[is_co2] <- -co2_cap else keep_rows[is_co2] <- FALSE
+  
+  # drop constraints that belong only to removed groups that are all zeros
+  keep_rows <- keep_rows & (rowSums(abs(A)) > 0)
+  A         <- A[keep_rows, , drop = FALSE]
+  b_vals    <- unname(b_vals[keep_rows])
+  row_names <- row_names[keep_rows]
+  
+  num_vars        <- ncol(A)  # n
+  num_constraints <- nrow(A)  # m
+  
+  # [ A^T | I_n | 0_z | C_primal ]
+  top_block  <- cbind(t(A), diag(num_vars), matrix(0, num_vars, 1), matrix(C_primal, num_vars, 1))
+  # [ -b_primal | 0_slack | 1_z | 0_sol ]
+  bottom_row <- c(-b_vals, numeric(num_vars), 1, 0)
+  
+  initial_tableau <- rbind(top_block, bottom_row)
+  
+  # descriptive names: S1_Demand_B1 ... | Coal_B1 ... (slack = the original unknown) | Z | Solution
+  colnames(initial_tableau) <- c(paste0("S", 1:num_constraints, "_", row_names), var_names, "Z", "Solution")
+  rownames(initial_tableau) <- c(var_names, "Z")
+  
+  return(list(tableau = initial_tableau, m = num_constraints, n = num_vars, b = b_vals, constraint_names = row_names, var_names = var_names, groups = keys))
 }
 
 # shadow prices from final tableau
 shadow_prices <- function(final_tableau, m, tol = 1e-8){
-    numRows <- nrow(final_tableau)
-    numCols <- ncol(final_tableau)
-    S <- numeric(m)
-    for (i in 1:m){
-        col <- final_tableau[, i]
-        nz  <- which(abs(col) > tol) # not zero
-        if (length(nz) == 1 && nz < numRows && abs(col[nz] - 1) < tol) S[i] <- final_tableau[nz, numCols]
-    }
-    names(S) <- colnames(final_tableau)[1:m]
-    return(S)
+  numRows <- nrow(final_tableau)
+  numCols <- ncol(final_tableau)
+  S <- numeric(m)
+  for (i in 1:m){
+    col <- final_tableau[, i]
+    nz  <- which(abs(col) > tol) # not zero
+    if (length(nz) == 1 && nz < numRows && abs(col[nz] - 1) < tol) S[i] <- final_tableau[nz, numCols]
+  }
+  names(S) <- colnames(final_tableau)[1:m]
+  return(S)
 }
 
-# basic solution of a minimization tableau (bottom row), used for every iteration of the history
+# basic solution of a minimization tableau (bottom row), used for every iteration
 basic_solution_min <- function(tableau){
-    numRows <- nrow(tableau); numCols <- ncol(tableau)
-    bs <- tableau[numRows, 1:(numCols - 1)]
-    bs[length(bs)] <- tableau[numRows, numCols] # the Z column shows Z
-    return(bs)
+  numRows <- nrow(tableau); numCols <- ncol(tableau)
+  bs <- tableau[numRows, 1:(numCols - 1)]
+  bs[length(bs)] <- tableau[numRows, numCols] # the Z column shows Z
+  return(bs)
 }
 
-# UI calls this function for input validations
+# func for input validations
 validate_input <- function(selected_groups, co2_on, co2_cap){
-    if (length(selected_groups) == 0) return("No plant group selected.")
-    if (isTRUE(co2_on) && (is.null(co2_cap) || length(co2_cap) != 1 || is.na(suppressWarnings(as.numeric(co2_cap))) || as.numeric(co2_cap) <= 0))
-        return("The CO2 cap must be a number greater than 0.")
-    return(NULL)
+  if (length(selected_groups) == 0) return("No plant group selected.")
+  if (isTRUE(co2_on) && (is.null(co2_cap) || length(co2_cap) != 1 || is.na(suppressWarnings(as.numeric(co2_cap))) || as.numeric(co2_cap) <= 0))
+    return("The CO2 cap must be a number greater than 0.")
+  return(NULL)
 }
 
 solve_func <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, primal = NULL, keepHistory = FALSE){
-    msg <- validate_input(selected_groups, co2_on, co2_cap)
-    if (!is.null(msg)) return(list(status = "invalid", message = msg))
-
-    if (is.null(primal)) primal <- read_primal_csv(CSV_PATH)
-    if (co2_on) co2_cap <- as.numeric(co2_cap)
-    built <- build_initial_tableau(primal, selected_groups, co2_on, co2_cap)
-    res   <- Simplex(built$tableau, FALSE, keepHistory)
-
-    out <- list(status = NA, message = NA, groups = display_name(built$groups), co2_on = co2_on, co2_cap = if (co2_on) co2_cap else NA,
-                num_unknowns = built$n, num_constraints = built$m, iterations = res$iterations,
-                initial_tableau = built$tableau)
-
-    if (res$infeasible){
-        out$status  <- "infeasible"
-        out$message <- "The problem is infeasible."
-    } else {
-        # dispatch x_gt = slack columns of the BOTTOM ROW; prices = S_t / h from the Solution column
-        x <- res$basicSolution[built$m + 1:built$n]
-        x[abs(x) < 1e-9] <- 0
-        dispatch <- matrix(x, nrow = length(built$groups), ncol = N_BLOCKS, byrow = TRUE,
-                           dimnames = list(display_name(built$groups), paste0("B", 1:N_BLOCKS)))
-        S <- shadow_prices(res$finalTableau, built$m)
-
-        out$status   <- "optimal"
-        out$message  <- "Optimal solution found"
-        out$Z        <- res$Z
-        out$dispatch <- dispatch                                   # rows = groups, cols = B1..B6 (MW)
-        out$prices   <- setNames(S[1:N_BLOCKS] / BLOCK_HOURS, paste0("B", 1:N_BLOCKS)) # PHP/MWh
-        out$check_sum_bS <- sum(built$b * S)                       # must equal Z
-        out$final_tableau <- res$finalTableau
-    }
-    if (keepHistory) out$history <- res$history
-    return(out)
-}
-
-# pass to next.js as .json (install.packages("jsonlite"))
-# retains digits = NA for precision
-result_to_json <- function(res, include_history = FALSE){
-    # if (!requireNamespace("jsonlite", quietly = TRUE)) stop("Install jsonlite: install.packages(\"jsonlite\")")
-    keep <- c("status", "message", "groups", "co2_on", "co2_cap", "num_unknowns", "num_constraints", "iterations", "Z", "check_sum_bS")
-    payload <- res[intersect(keep, names(res))]
-    if (!is.null(res$dispatch)){
-        payload$blocks   <- colnames(res$dispatch)
-        payload$dispatch <- lapply(rownames(res$dispatch), function(g) as.list(res$dispatch[g, ]))
-        names(payload$dispatch) <- rownames(res$dispatch)         # {"Coal": {"B1": 6160, ...}, ...}
-        payload$prices   <- as.list(res$prices)                   # {"B1": 3800, ...}
-    }
-    if (include_history && !is.null(res$history)){
-        payload$tableau_row_names <- rownames(res$initial_tableau)
-        payload$tableau_col_names <- colnames(res$initial_tableau)
-        payload$history <- lapply(res$history, function(h) list(
-            iteration = h$iteration,
-            pivotRow  = if (is.na(h$pivotRow)) NA_integer_ else as.integer(h$pivotRow),   # 1-based; null when there is no pivot
-            pivotCol  = if (is.na(h$pivotCol)) NA_integer_ else as.integer(h$pivotCol),   # same thing
-            tableau   = unname(h$tableau),                              # array of rows
-            basic_solution = as.list(basic_solution_min(h$tableau))))
-    }
-    return(jsonlite::toJSON(payload, auto_unbox = TRUE, digits = NA, na = "null", pretty = FALSE))
+  msg <- validate_input(selected_groups, co2_on, co2_cap)
+  if (!is.null(msg)) return(list(status = "invalid", message = msg))
+  
+  if (is.null(primal)) primal <- read_primal_csv(CSV_PATH)
+  if (co2_on) co2_cap <- as.numeric(co2_cap)
+  built <- build_initial_tableau(primal, selected_groups, co2_on, co2_cap)
+  res   <- Simplex(built$tableau, FALSE, keepHistory)
+  
+  out <- list(status = NA, message = NA, groups = display_name(built$groups), co2_on = co2_on, co2_cap = if (co2_on) co2_cap else NA,
+              num_unknowns = built$n, num_constraints = built$m, iterations = res$iterations,
+              initial_tableau = built$tableau)
+  
+  if (res$infeasible){
+    out$status  <- "infeasible"
+    out$message <- "The problem is infeasible."
+  } else {
+    # dispatch x_gt = slack columns of the BOTTOM ROW; prices = S_t / h from the Solution column
+    x <- res$basicSolution[built$m + 1:built$n]
+    x[abs(x) < 1e-9] <- 0
+    dispatch <- matrix(x, nrow = length(built$groups), ncol = N_BLOCKS, byrow = TRUE,
+                       dimnames = list(display_name(built$groups), paste0("B", 1:N_BLOCKS)))
+    S <- shadow_prices(res$finalTableau, built$m)
+    
+    out$status   <- "optimal"
+    out$message  <- "Optimal solution found"
+    out$Z        <- res$Z
+    out$dispatch <- dispatch                                   # rows = groups, cols = B1..B6 (MW)
+    out$prices   <- setNames(S[1:N_BLOCKS] / BLOCK_HOURS, paste0("B", 1:N_BLOCKS)) # PHP/MWh
+    out$check_sum_bS <- sum(built$b * S)                       # must equal Z
+    out$final_tableau <- res$finalTableau
+  }
+  if (keepHistory) out$history <- res$history
+  return(out)
 }
 
 # prints test cases
 print_result <- function(name, res){
-    cat("=====", name, "=====\n")
-    cat("Plant groups :", paste(res$groups, collapse = ", "), "\n")
-    cat("CO2 cap      :", if (isTRUE(res$co2_on)) paste0("ON (", format(res$co2_cap, big.mark = ","), " t/day)") else "OFF", "\n")
-    if (res$status == "invalid"){ cat("Invalid input:", res$message, "\n\n"); return(invisible()) }
-    cat("LP setup     :", res$num_unknowns, "unknowns,", res$num_constraints, "constraints\n")
-    cat("Iterations   :", res$iterations, "\n")
-    if (res$status == "infeasible"){ cat("Result       : The problem is infeasible.\n\n"); return(invisible()) }
-    cat("Total minimum cost, Z :", format(res$Z, big.mark = ",", nsmall = 2), "\n")
-    cat("Unknowns x_gt (MW):\n");              print(round(res$dispatch, 2))
-    cat("Price = S_t / 4 (PHP/MWh):\n");       print(round(res$prices, 2))
-    cat("Check sum(b * S) - Z =", format(res$check_sum_bS - res$Z, digits = 3), "\n\n")
+  cat("=====", name, "=====\n")
+  cat("Plant groups :", paste(res$groups, collapse = ", "), "\n")
+  cat("CO2 cap      :", if (isTRUE(res$co2_on)) paste0("ON (", format(res$co2_cap, big.mark = ","), " t/day)") else "OFF", "\n")
+  if (res$status == "invalid"){ cat("Invalid input:", res$message, "\n\n"); return(invisible()) }
+  cat("LP setup     :", res$num_unknowns, "unknowns,", res$num_constraints, "constraints\n")
+  cat("Iterations   :", res$iterations, "\n")
+  if (res$status == "infeasible"){ cat("Result       : The problem is infeasible.\n\n"); return(invisible()) }
+  cat("Total minimum cost, Z :", format(res$Z, big.mark = ",", nsmall = 2), "\n")
+  cat("Unknowns x_gt (MW):\n");              print(round(res$dispatch, 2))
+  cat("Price = S_t / 4 (PHP/MWh):\n");       print(round(res$prices, 2))
+  cat("Check sum(b * S) - Z =", format(res$check_sum_bS - res$Z, digits = 3), "\n\n")
 }
 
 check_case <- function(case, res){
-    ok <- res$status == case$status && res$iterations == case$iterations
-    if (case$status == "optimal"){
-        ok <- ok && abs(res$Z - case$Z) / case$Z < 1e-4 &&                      # within 0.01 %
-                    all(abs(res$prices - case$prices) <= 0.01) &&               # within 0.01 PHP/MWh
-                    abs(res$check_sum_bS - res$Z) / res$Z < 1e-9
-    }
-    cat(if (ok) "PASS" else "FAIL", "-", case$name, "\n\n")
-    return(ok)
+  ok <- res$status == case$status && res$iterations == case$iterations
+  if (case$status == "optimal"){
+    ok <- ok && abs(res$Z - case$Z) / case$Z < 1e-4 &&                      # within 0.01 %
+      all(abs(res$prices - case$prices) <= 0.01) &&               # within 0.01 PHP/MWh
+      abs(res$check_sum_bS - res$Z) / res$Z < 1e-9
+  }
+  cat(if (ok) "PASS" else "FAIL", "-", case$name, "\n\n")
+  return(ok)
 }
 
 TEST_CASES <- list(
-    list(name = "Test Case #1", groups = c("Coal", "Natural Gas", "Hydro", "Oil-based", "Solar", "Wind"),
-         co2_on = FALSE, co2_cap = 165000, status = "optimal", iterations = 34, Z = 1149843800,
-         prices = c(3800, 6565, 6695, 14700, 14700, 14280)),
-    list(name = "Test Case #2", groups = c("Coal", "Natural Gas", "Geothermal", "Hydro", "Oil-based", "Wind"),
-         co2_on = TRUE, co2_cap = 180000, status = "optimal", iterations = 39, Z = 1181240745.45,
-         prices = c(8473.45, 8538.45, 18120.23, 18400.23, 18400.23, 8603.45)),
-    list(name = "Test Case #3", groups = c("Coal", "Natural Gas", "Geothermal", "Hydro", "Oil-based", "Wind"),
-         co2_on = TRUE, co2_cap = 165000, status = "infeasible", iterations = 37)
+  list(name = "Test Case #1", groups = c("Coal", "Natural Gas", "Hydro", "Oil-based", "Solar", "Wind"),
+       co2_on = FALSE, co2_cap = 165000, status = "optimal", iterations = 34, Z = 1149843800,
+       prices = c(3800, 6565, 6695, 14700, 14700, 14280)),
+  list(name = "Test Case #2", groups = c("Coal", "Natural Gas", "Geothermal", "Hydro", "Oil-based", "Wind"),
+       co2_on = TRUE, co2_cap = 180000, status = "optimal", iterations = 39, Z = 1181240745.45,
+       prices = c(8473.45, 8538.45, 18120.23, 18400.23, 18400.23, 8603.45)),
+  list(name = "Test Case #3", groups = c("Coal", "Natural Gas", "Geothermal", "Hydro", "Oil-based", "Wind"),
+       co2_on = TRUE, co2_cap = 165000, status = "infeasible", iterations = 37)
 )
 
-if (sys.nframe() == 0){ # only runs with `Rscript CerdeñaProject.R`, not when this file is source()d
-    primal <- read_primal_csv(CSV_PATH)
-    cat("CSV read:", nrow(primal$A), "constraints x", ncol(primal$A), "unknowns\n\n")
-    passed <- 0
-    for (case in TEST_CASES){
-        res <- solve_dispatch(case$groups, case$co2_on, case$co2_cap, primal)
-        print_result(case$name, res)
-        if (check_case(case, res)) passed <- passed + 1
-    }
-    cat(passed, "of", length(TEST_CASES), "test cases passed\n")
+# =====================================================================================
+#                                    R SHINY USER INTERFACE
+# =====================================================================================
 
-    cat("\n--- Invalid input examples ---\n")
-    print_result("No group selected", c(solve_func(character(0), TRUE, 165000, primal), list(groups = "none")))
-    print_result("CO2 cap of 0",      c(solve_func("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+PESO <- "\u20b1"  # peso sign 
+# display-only info for the UI (the numbers used by the solver all come from Primal.csv)
+GROUP_COLORS <- c("Coal" = "#4b5563", "Natural Gas" = "#f08a24", "Geothermal" = "#a66bbe", "Hydro" = "#2f6fb3",
+                  "Oil-based" = "#8b5a3c", "Solar" = "#f2c200", "Wind" = "#3fa66a")
+GROUP_CAP    <- c("Coal" = 7000, "Natural Gas" = 3300, "Geothermal" = 800, "Hydro" = 2500,
+                  "Oil-based" = 1500, "Solar" = 2500, "Wind" = 400)
+BLOCK_LABELS <- c("12\u20134 AM", "4\u20138 AM", "8 AM\u201312 NN", "12\u20134 PM", "4\u20138 PM", "8 PM\u201312 MN")
+
+# ---- number formatting ------------------------------------------------------------
+# trims trailing zeros: 7000.00 -> "7,000" ; 4540.909 -> "4,540.91"
+fmt_num <- function(x, digits = 2){
+  x   <- ifelse(abs(x) < 1e-9, 0, x)
+  out <- formatC(x, format = "f", digits = digits, big.mark = ",")
+  out <- ifelse(grepl("\\.", out), sub("\\.?0+$", "", out), out)
+  out[out %in% c("-0", "")] <- "0"
+  return(out)
 }
+# always 2 decimals: 3800 -> "3,800.00"
+fmt_fixed <- function(x) formatC(ifelse(abs(x) < 1e-9, 0, x), format = "f", digits = 2, big.mark = ",")
+
+esc <- function(x) htmltools::htmlEscape(x)
+
+# ---- small HTML builders (plain tables so we control scrolling, sticky headers and highlights) ----
+alert_box <- function(type, title, body = NULL){
+  div(class = paste("alert-box", type), div(class = "alert-title", title), if (!is.null(body)) div(class = "alert-body", body))
+}
+
+metric_card <- function(label, value, sub = NULL, cls = ""){
+  div(class = paste("metric", cls), div(class = "metric-label", label), div(class = "metric-value", value),
+      if (!is.null(sub)) div(class = "metric-sub", sub))
+}
+
+# generic scrollable matrix -> HTML. cls = matrix of css classes for each cell, hcls = css class of each column header
+grid_html <- function(M, rn, cn, cls = NULL, hcls = NULL, corner = "", maxh = 520){
+  nr <- nrow(M); nc <- ncol(M)
+  if (is.null(cls))  cls  <- matrix("", nr, nc)
+  if (is.null(hcls)) hcls <- rep("", nc)
+  head <- paste0("<tr><th class='corner'>", esc(corner), "</th>",
+                 paste0("<th class='", hcls, "'>", esc(cn), "</th>", collapse = ""), "</tr>")
+  body <- vapply(seq_len(nr), function(i){
+    paste0("<tr><th class='rh'>", esc(rn[i]), "</th>",
+           paste0("<td class='", cls[i, ], "'>", M[i, ], "</td>", collapse = ""), "</tr>")
+  }, character(1))
+  HTML(paste0("<div class='scroll-box' style='max-height:", maxh, "px'><table class='grid-tbl'><thead>", head,
+              "</thead><tbody>", paste(body, collapse = ""), "</tbody></table></div>"))
+}
+
+# Dispatch table x_gt (MW) with a colour-intensity heat shading per row
+dispatch_html <- function(d){
+  nr <- nrow(d)
+  cells <- vapply(seq_len(nr), function(i){
+    g    <- rownames(d)[i]
+    rgbv <- col2rgb(GROUP_COLORS[g])
+    mx   <- max(d[i, ])
+    a    <- if (mx > 0) 0.06 + 0.44 * d[i, ] / mx else rep(0, ncol(d))
+    paste0("<tr><th class='rh'><span class='dot' style='background:", GROUP_COLORS[g], "'></span>", esc(g), "</th>",
+           paste0("<td style='background:rgba(", rgbv[1], ",", rgbv[2], ",", rgbv[3], ",", sprintf("%.2f", a), ")'>",
+                  fmt_num(d[i, ]), "</td>", collapse = ""), "</tr>")
+  }, character(1))
+  total <- paste0("<tr class='total'><th class='rh'>Total</th>", paste0("<td>", fmt_num(colSums(d)), "</td>", collapse = ""), "</tr>")
+  head  <- paste0("<tr><th class='corner'>Plant group</th>",
+                  paste0("<th>", colnames(d), "<small>", BLOCK_LABELS, "</small></th>", collapse = ""), "</tr>")
+  HTML(paste0("<div class='scroll-box'><table class='grid-tbl'><thead>", head, "</thead><tbody>",
+              paste(cells, collapse = ""), total, "</tbody></table></div>"))
+}
+
+prices_html <- function(prices, h = BLOCK_HOURS){
+  head <- paste0("<tr><th class='corner'></th>", paste0("<th>", names(prices), "<small>", BLOCK_LABELS, "</small></th>", collapse = ""), "</tr>")
+  r1   <- paste0("<tr><th class='rh'>Shadow price S<sub>t</sub> (", PESO, ")</th>", paste0("<td>", fmt_fixed(prices * h), "</td>", collapse = ""), "</tr>")
+  r2   <- paste0("<tr class='price-row'><th class='rh'>Price = S<sub>t</sub> / ", h, " (", PESO, "/MWh)</th>",
+                 paste0("<td>", fmt_fixed(prices), "</td>", collapse = ""), "</tr>")
+  HTML(paste0("<div class='scroll-box'><table class='grid-tbl'><thead>", head, "</thead><tbody>", r1, r2, "</tbody></table></div>"))
+}
+
+# non-zero shadow prices of ALL constraints + the check  sum(b_i * S_i) = Z
+shadow_html <- function(res){
+  m   <- res$num_constraints
+  S   <- shadow_prices(res$final_tableau, m)
+  b   <- -unname(res$initial_tableau[nrow(res$initial_tableau), 1:m])   # bottom row of the initial tableau holds -b
+  nm  <- sub("^S[0-9]+_", "", names(S))
+  idx <- which(abs(S) > 1e-9)
+  if (length(idx) == 0) return(HTML("<p class='muted'>All shadow prices are 0.</p>"))
+  rows <- vapply(idx, function(i) paste0("<tr><th class='rh'>S<sub>", i, "</sub> &nbsp;", esc(nm[i]), "</th><td>", fmt_fixed(S[i]),
+                                         "</td><td>", fmt_num(b[i]), "</td><td>", fmt_fixed(b[i] * S[i]), "</td></tr>"), character(1))
+  tot <- paste0("<tr class='total'><th class='rh'>Sum of b<sub>i</sub> &middot; S<sub>i</sub></th><td></td><td></td><td>", fmt_fixed(sum(b * S)), "</td></tr>")
+  HTML(paste0("<div class='scroll-box' style='max-height:320px'><table class='grid-tbl'><thead><tr><th class='corner'>Constraint (non-zero S<sub>i</sub> only)</th>",
+              "<th>S<sub>i</sub></th><th>RHS b<sub>i</sub></th><th>b<sub>i</sub> &middot; S<sub>i</sub></th></tr></thead><tbody>",
+              paste(rows, collapse = ""), tot, "</tbody></table></div>"))
+}
+
+# ---- UI ----------------------------------------------------------------------------
+APP_CSS <- "
+:root{ --navy:#0f2540; --navy2:#16355c; --amber:#f5a623; --ink:#1d2a3a; --muted:#6b7a8c; --line:#e3e8ef; --bg:#f3f6fa; }
+body{ background:var(--bg); color:var(--ink); font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif; }
+.container-fluid{ padding:0; }
+.app-header{ background:linear-gradient(120deg,var(--navy) 0%,var(--navy2) 60%,#1e4a7d 100%); color:#fff; padding:18px 28px; border-bottom:4px solid var(--amber); }
+.app-header h1{ margin:0; font-size:26px; font-weight:700; letter-spacing:.2px; }
+.app-header h1 .bolt{ color:var(--amber); margin-right:6px; }
+.app-header p{ margin:4px 0 0; color:#b9c9de; font-size:13.5px; }
+.app-body{ padding:20px 28px 40px; }
+.card-lite{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(15,37,64,.05); }
+.card-lite h4{ margin:0 0 10px; font-size:15px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.6px; }
+.card-lite h4 small{ text-transform:none; letter-spacing:0; font-weight:400; color:var(--muted); margin-left:6px; }
+.step-no{ display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; border-radius:50%; background:var(--amber); color:var(--navy); font-size:12px; font-weight:800; margin-right:8px; }
+.shiny-input-container{ width:100% !important; max-width:100%; }
+.checkbox{ margin:4px 0; }
+.checkbox label{ display:flex; align-items:center; width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:#fafcff; cursor:pointer; font-weight:500; }
+.checkbox label:hover{ border-color:var(--amber); background:#fff9ee; }
+.checkbox label>span{ display:flex; align-items:center; flex:1; }
+.checkbox input[type=checkbox]{ margin:0 10px 0 0 !important; position:static; }
+.dot{ display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:8px; flex:none; }
+.cap{ margin-left:auto; color:var(--muted); font-size:12px; font-weight:400; padding-left:8px; }
+.btn-row{ display:flex; gap:8px; margin:8px 0 2px; }
+.btn-row .btn{ flex:1; }
+.btn-soft{ background:#eef3f9; border:1px solid var(--line); color:var(--navy); font-weight:600; }
+.btn-soft:hover{ background:#e2ebf5; }
+#solve{ width:100%; background:var(--amber); border:none; color:var(--navy); font-weight:800; font-size:16px; padding:12px; border-radius:10px; letter-spacing:.4px; }
+#solve:hover{ background:#ffb83d; }
+.co2-note{ color:var(--muted); font-size:12.5px; margin:4px 0 0; }
+.test-row .btn{ font-size:12.5px; padding:4px 8px; }
+.nav-tabs{ border-bottom:2px solid var(--line); }
+.nav-tabs>li>a{ color:var(--muted); font-weight:700; border:none !important; border-bottom:3px solid transparent !important; margin-right:6px; }
+.nav-tabs>li.active>a, .nav-tabs>li.active>a:hover, .nav-tabs>li.active>a:focus{ color:var(--navy); background:transparent; border-bottom:3px solid var(--amber) !important; }
+.tab-content{ padding-top:16px; }
+.alert-box{ border-radius:12px; padding:14px 18px; margin-bottom:16px; border:1px solid; }
+.alert-box.ok{ background:#e9f8ef; border-color:#a8dfbd; color:#14532d; }
+.alert-box.bad{ background:#fdecec; border-color:#f3b4b4; color:#7f1d1d; }
+.alert-box.warn{ background:#fff6e0; border-color:#f3d28a; color:#6b4a00; }
+.alert-box.info{ background:#eaf2fc; border-color:#b7d0f0; color:#17406f; }
+.alert-title{ font-size:17px; font-weight:800; } .alert-body{ margin-top:3px; font-size:14px; }
+.metrics{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
+.metric{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; border-top:4px solid var(--navy2); }
+.metric.main{ border-top-color:var(--amber); grid-column:span 2; }
+.metric-label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); font-weight:700; }
+.metric-value{ font-size:26px; font-weight:800; color:var(--navy); line-height:1.25; word-break:break-all; }
+.metric-sub{ font-size:12px; color:var(--muted); }
+.scroll-box{ overflow:auto; max-width:100%; border:1px solid var(--line); border-radius:8px; }
+.grid-tbl{ border-collapse:separate; border-spacing:0; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
+.grid-tbl th, .grid-tbl td{ padding:6px 10px; border-bottom:1px solid #eef1f5; border-right:1px solid #f1f4f8; text-align:right; white-space:nowrap; }
+.grid-tbl thead th{ position:sticky; top:0; background:var(--navy); color:#fff; z-index:2; font-weight:600; text-align:center; }
+.grid-tbl thead th small{ display:block; font-weight:400; font-size:10.5px; color:#b9c9de; }
+.grid-tbl th.rh{ position:sticky; left:0; background:#f6f8fb; text-align:left; font-weight:600; z-index:1; border-right:2px solid var(--line); }
+.grid-tbl thead th.corner{ left:0; z-index:3; text-align:left; background:var(--navy2); }
+.grid-tbl tr.total td, .grid-tbl tr.total th{ background:#eef3f9; font-weight:700; }
+.grid-tbl tr.price-row td{ background:#fff7e6; font-weight:800; color:var(--navy); font-size:14px; }
+.grid-tbl tr.price-row th{ background:#fff1d1; }
+.grid-tbl thead th.hS{ background:#7a3b0c; } .grid-tbl thead th.hX{ background:var(--navy); } .grid-tbl thead th.hZ{ background:#2c3e50; }
+.grid-tbl td.prow{ background:#fff3d6; } .grid-tbl td.pcol{ background:#e1effd; } .grid-tbl td.pcell{ background:var(--amber); color:#000; font-weight:800; }
+.grid-tbl td.neg{ color:#c0152f; font-weight:700; } .grid-tbl td.nz{ background:#e9f8ef; font-weight:700; }
+.grid-tbl td.zero{ color:#b6c0cc; }
+.pivot-info{ font-size:13.5px; background:#fff; border:1px solid var(--line); border-left:5px solid var(--amber); border-radius:8px; padding:9px 14px; margin-bottom:12px; }
+.iter-ctrl{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+.iter-ctrl .btn{ font-weight:700; }
+.irs--shiny .irs-bar{ background:var(--amber); border-color:var(--amber); } .irs--shiny .irs-handle{ border-color:var(--navy); }
+.legend-line{ font-size:12px; color:var(--muted); margin:8px 0 0; }
+.legend-line span.sw{ display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin:0 4px 0 10px; }
+.muted{ color:var(--muted); }
+.welcome ol{ padding-left:20px; } .welcome li{ margin-bottom:5px; }
+.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:1100px){ .two-col{ grid-template-columns:1fr; } }
+"
+
+ui <- fluidPage(
+  title = "Luzon Grid Dispatch Simulator",
+  tags$head(tags$style(HTML(APP_CSS))),
+  div(class = "app-header",
+      h1(span(class = "bolt", HTML("&#9889;")), "Luzon Grid Dispatch & Price Simulator"),
+      p("Cheapest way to run the Luzon power plants for one day \u00b7 solved with the simplex method on the dual \u00b7 CMSC 150")),
+  div(class = "app-body",
+      sidebarLayout(
+        sidebarPanel(width = 4,
+                     div(class = "card-lite",
+                         h4(span(class = "step-no", "1"), "Plant groups"),
+                         checkboxGroupInput("groups", NULL,
+                                            choiceNames  = lapply(names(GROUP_KEYS), function(g)
+                                              HTML(paste0("<span class='dot' style='background:", GROUP_COLORS[g], "'></span>", g,
+                                                          "<span class='cap'>", format(GROUP_CAP[g], big.mark = ","), " MW</span>"))),
+                                            choiceValues = names(GROUP_KEYS)),
+                         div(class = "btn-row",
+                             actionButton("check_all", "Check All", class = "btn-soft"),
+                             actionButton("reset", "Reset", class = "btn-soft"))),
+                     div(class = "card-lite",
+                         h4(span(class = "step-no", "2"), "CO\u2082 cap"),
+                         checkboxInput("co2_on", "Limit daily CO\u2082 emissions", value = FALSE),
+                         conditionalPanel("input.co2_on",
+                                          numericInput("co2_cap", "Limit (t CO\u2082 / day)", value = 165000, min = 0, step = 1000),
+                                          p(class = "co2-note", "Default 165,000 t. Must be greater than 0."))),
+                     div(class = "card-lite",
+                         h4(span(class = "step-no", "3"), "Solve"),
+                         actionButton("solve", HTML("&#9889; Find cheapest dispatch")),
+                         hr(style = "margin:14px 0 8px"),
+                         p(class = "muted", style = "font-size:12.5px; margin:0 0 6px", "Quick-load a sample case (then press Solve):"),
+                         div(class = "btn-row test-row",
+                             actionButton("tc1", "Test #1", class = "btn-soft"),
+                             actionButton("tc2", "Test #2", class = "btn-soft"),
+                             actionButton("tc3", "Test #3", class = "btn-soft")))
+        ),
+        mainPanel(width = 8,
+                  tabsetPanel(id = "tabs",
+                              tabPanel("Results", uiOutput("results_ui")),
+                              tabPanel("Simplex Tableau", uiOutput("tableau_tab"))
+                  )
+        )
+      )
+  )
+)
+
+# ---- Server ------------------------------------------------------------------------
+server <- function(input, output, session){
+  # the primal tableau is read ONCE; any problem is turned into a friendly message (never a raw error)
+  primal <- tryCatch(read_primal_csv(CSV_PATH), error = function(e) NULL)
+  rv <- reactiveValues(res = NULL)
+  
+  # ---- inputs: Check All / Reset / sample test cases ----
+  observeEvent(input$check_all, updateCheckboxGroupInput(session, "groups", selected = names(GROUP_KEYS)))
+  observeEvent(input$reset, {
+    updateCheckboxGroupInput(session, "groups", selected = character(0))
+    updateCheckboxInput(session, "co2_on", value = FALSE)
+    updateNumericInput(session, "co2_cap", value = 165000)
+    rv$res <- NULL
+  })
+  load_case <- function(idx){
+    tc <- TEST_CASES[[idx]]
+    updateCheckboxGroupInput(session, "groups", selected = tc$groups)
+    updateCheckboxInput(session, "co2_on", value = tc$co2_on)
+    updateNumericInput(session, "co2_cap", value = tc$co2_cap)
+  }
+  observeEvent(input$tc1, load_case(1))
+  observeEvent(input$tc2, load_case(2))
+  observeEvent(input$tc3, load_case(3))
+  
+  # ---- solve ----
+  observeEvent(input$solve, {
+    if (is.null(primal)){
+      rv$res <- list(status = "error", message = paste0("The primal tableau file \"", CSV_PATH, "\" could not be read. Place it in the same folder as the app and restart."))
+    } else {
+      rv$res <- tryCatch(
+        solve_func(input$groups %||% character(0), isTRUE(input$co2_on), input$co2_cap, primal, keepHistory = TRUE),
+        error = function(e) list(status = "error", message = "Something went wrong while solving. Please check your selection and try again."))
+    }
+    updateTabsetPanel(session, "tabs", selected = "Results")
+  })
+  
+  # ---- Results tab ----
+  output$results_ui <- renderUI({
+    res <- rv$res
+    if (is.null(res)){
+      return(div(class = "card-lite welcome",
+                 h4("Welcome"),
+                 tags$ol(
+                   tags$li("Tick the plant groups that are available (or press ", tags$b("Check All"), ")."),
+                   tags$li("Optionally switch on the CO\u2082 cap and edit its limit."),
+                   tags$li("Press ", tags$b("Find cheapest dispatch"), ".")),
+                 p(class = "muted", "You will get the minimum daily cost, the output of every plant in every 4-hour block, and the price of electricity in each block. ",
+                   "The ", tags$b("Simplex Tableau"), " tab lets you step through every iteration.")))
+    }
+    if (res$status == "invalid") return(alert_box("warn", "Invalid input", res$message))
+    if (res$status == "error")   return(alert_box("bad", "Unable to solve", res$message))
+    
+    setup <- div(class = "card-lite",
+                 h4("Linear programming setup"),
+                 p(style = "margin:0", tags$b(res$num_unknowns), " unknowns (x", tags$sub("gt"), ") \u00b7 ", tags$b(res$num_constraints), " constraints \u00b7 groups: ",
+                   paste(res$groups, collapse = ", "), " \u00b7 CO\u2082 cap: ",
+                   if (isTRUE(res$co2_on)) paste0("ON (", format(res$co2_cap, big.mark = ","), " t/day)") else "OFF"))
+    
+    if (res$status == "infeasible"){
+      return(tagList(
+        alert_box("bad", "The problem is infeasible.",
+                  paste0("The selected plants cannot meet demand in every block under these limits (no test ratio could be chosen). Number of iterations: ", res$iterations, ".")),
+        div(class = "metrics", metric_card("Iterations", res$iterations), metric_card("Unknowns", res$num_unknowns), metric_card("Constraints", res$num_constraints)),
+        setup,
+        p(class = "muted", "Tip: select more plant groups, or raise / switch off the CO\u2082 cap. The Simplex Tableau tab shows where the algorithm got stuck.")))
+    }
+    
+    tagList(
+      alert_box("ok", "Optimal solution found"),
+      div(class = "metrics",
+          metric_card("Total minimum cost, Z", paste0(PESO, fmt_fixed(res$Z)), "for one day", "main"),
+          metric_card("Iterations", res$iterations),
+          metric_card("Unknowns", res$num_unknowns, "x\u2099\u209c variables"),
+          metric_card("Constraints", res$num_constraints)),
+      div(class = "card-lite", h4("Output of each plant group", tags$small("x", tags$sub("gt"), " in MW")), dispatch_html(res$dispatch)),
+      div(class = "card-lite", h4("Price of electricity", tags$small("by block, ", PESO, " per MWh")), prices_html(res$prices)),
+      div(class = "two-col",
+          div(class = "card-lite", h4("Dispatch chart"), plotOutput("plot_dispatch", height = "300px")),
+          div(class = "card-lite", h4("Price chart"),    plotOutput("plot_price",    height = "300px"))),
+      div(class = "card-lite",
+          h4("Shadow prices & check", tags$small("sum of b", tags$sub("i"), " \u00b7 S", tags$sub("i"), " = Z")),
+          shadow_html(res),
+          p(class = "legend-line", "Check: \u03a3 b", tags$sub("i"), "\u00b7S", tags$sub("i"), " = ", PESO, fmt_fixed(res$check_sum_bS),
+            " and Z = ", PESO, fmt_fixed(res$Z), if (abs(res$check_sum_bS - res$Z) / abs(res$Z) < 1e-9) "  \u2713 they match" else "  (mismatch)")),
+      setup)
+  })
+  
+  demand <- reactive(if (is.null(primal)) NULL else unname(primal$b[paste0("Demand_B", 1:N_BLOCKS)]))
+  
+  output$plot_dispatch <- renderPlot({
+    res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
+    d <- res$dispatch; cols <- GROUP_COLORS[rownames(d)]; dem <- demand()
+    par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
+    bp <- barplot(d, col = cols, border = NA, ylab = "Power (MW)", las = 1,
+                  ylim = c(0, max(colSums(d), dem) * 1.28), names.arg = paste0(colnames(d), "\n", BLOCK_LABELS), cex.names = 0.8)
+    lines(bp, dem, type = "b", pch = 19, lwd = 2.5, col = "#c0152f")
+    legend("top", legend = c(rownames(d), "Demand"), ncol = 4, bty = "n", cex = 0.8, pt.cex = 1.4,
+           pch = c(rep(15, nrow(d)), 19), col = c(cols, "#c0152f"), lty = c(rep(NA, nrow(d)), 1))
+  })
+  
+  output$plot_price <- renderPlot({
+    res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
+    p <- res$prices
+    par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
+    bp <- barplot(p, col = "#f5a623", border = NA, las = 1, ylim = c(0, max(p) * 1.18),
+                  ylab = paste0("Price (PHP / MWh)"), names.arg = paste0(names(p), "\n", BLOCK_LABELS), cex.names = 0.8)
+    text(bp, p, labels = fmt_fixed(p), pos = 3, cex = 0.8, font = 2, col = "#0f2540")
+  })
+  
+  # ---- Simplex Tableau tab ----
+  output$tableau_tab <- renderUI({
+    res <- rv$res
+    if (is.null(res) || is.null(res$history)){
+      return(alert_box("info", "No tableau yet", "Run the solver (or fix the input) to see the simplex tableau of every iteration here."))
+    }
+    N <- length(res$history) - 1
+    tagList(
+      div(class = "card-lite",
+          div(class = "iter-ctrl",
+              actionButton("iter_first", HTML("&#9198; First"), class = "btn-soft"),
+              actionButton("iter_prev",  HTML("&#9664; Prev"),  class = "btn-soft"),
+              actionButton("iter_next",  HTML("Next &#9654;"),  class = "btn-soft"),
+              actionButton("iter_last",  HTML("Last &#9197;"),  class = "btn-soft"),
+              span(class = "muted", style = "margin-left:8px", "Use the slider, the buttons, or press \u25b6 under the slider to play.")),
+          sliderInput("iter", "Iteration", min = 0, max = N, value = 0, step = 1, width = "100%",
+                      animate = animationOptions(interval = 700, loop = FALSE))),
+      uiOutput("tableau_view"))
+  })
+  
+  set_iter <- function(v) updateSliderInput(session, "iter", value = v)
+  observeEvent(input$iter_first, set_iter(0))
+  observeEvent(input$iter_prev,  set_iter(max(0, (input$iter %||% 0) - 1)))
+  observeEvent(input$iter_next,  { req(rv$res$history); set_iter(min(length(rv$res$history) - 1, (input$iter %||% 0) + 1)) })
+  observeEvent(input$iter_last,  { req(rv$res$history); set_iter(length(rv$res$history) - 1) })
+  
+  output$tableau_view <- renderUI({
+    res <- rv$res; req(!is.null(res), !is.null(res$history))
+    hist <- res$history
+    k    <- min(max((input$iter %||% 0), 0), length(hist) - 1) + 1
+    h    <- hist[[k]]; tab <- h$tableau
+    nr <- nrow(tab); nc <- ncol(tab); m <- res$num_constraints; n <- res$num_unknowns
+    pr <- h$pivotRow; pc <- h$pivotCol
+    
+    # what happens at this iteration
+    info <- if (!is.na(pr)){
+      pe <- tab[pr, pc]
+      paste0("Pivot column: <b>", esc(colnames(tab)[pc]), "</b> (most negative bottom-row entry, ", fmt_num(tab[nr, pc], 4), ") &nbsp;\u00b7&nbsp; ",
+             "Pivot row: <b>", esc(rownames(tab)[pr]), "</b> (smallest test ratio, ", fmt_num(tab[pr, nc] / pe, 4), ") &nbsp;\u00b7&nbsp; ",
+             "Pivot element: <b>", fmt_num(pe, 4), "</b>")
+    } else if (!is.na(pc)){
+      paste0("<b>Infeasible.</b> Pivot column <b>", esc(colnames(tab)[pc]), "</b> has no positive entry, so there is no test ratio to choose from.")
+    } else {
+      "<b>Final tableau.</b> No negative entries are left in the bottom row, so the solution is optimal."
+    }
+    
+    # cell classes: pivot row / column / cell, negative bottom-row entries, zeros
+    cls <- matrix("", nr, nc)
+    cls[abs(tab) < 1e-9] <- "zero"
+    cls[nr, which(tab[nr, 1:(nc - 1)] < -1e-8)] <- "neg"
+    if (!is.na(pr)) cls[pr, ] <- "prow"
+    if (!is.na(pc)) cls[, pc] <- ifelse(cls[, pc] == "neg", "neg pcol", "pcol")
+    if (!is.na(pr) && !is.na(pc)) cls[pr, pc] <- "pcell"
+    hcls <- c(rep("hS", m), rep("hX", n), "hZ", "hZ")
+    
+    # basic solution of this iteration: the bottom row, with the Z column showing Z
+    bs <- basic_solution_min(tab)
+    bs_cls <- matrix(ifelse(abs(bs) > 1e-9, "nz", "zero"), nrow = 1)
+    
+    tagList(
+      div(class = "pivot-info", HTML(paste0("<b>Iteration ", h$iteration, " of ", length(hist) - 1, "</b> &nbsp;|&nbsp; ", info))),
+      div(class = "card-lite",
+          h4("Simplex tableau", tags$small("iteration ", h$iteration)),
+          grid_html(matrix(fmt_num(tab, 4), nr, nc), rownames(tab), colnames(tab), cls, hcls, corner = "Row \\ Column", maxh = 560),
+          p(class = "legend-line",
+            tags$span(class = "sw", style = "background:#7a3b0c"), "S", tags$sub("i"), " columns (dual variables / shadow prices)",
+            tags$span(class = "sw", style = "background:#0f2540"), "slack columns = original unknowns x", tags$sub("gt"),
+            tags$span(class = "sw", style = "background:#fff3d6;border:1px solid #ddd"), "pivot row",
+            tags$span(class = "sw", style = "background:#e1effd;border:1px solid #ddd"), "pivot column",
+            tags$span(class = "sw", style = "background:#f5a623"), "pivot element")),
+      div(class = "card-lite",
+          h4("Basic solution", tags$small("iteration ", h$iteration, " \u00b7 read from the bottom row; the Z column shows Z")),
+          grid_html(matrix(fmt_num(unname(bs), 4), 1, length(bs)), "Basic Solution", names(bs), bs_cls, hcls[-length(hcls)], corner = "", maxh = 140)))
+  })
+}
+
+# =====================================================================================
+#                                       LAUNCH
+# =====================================================================================
+
+# `Rscript CerdeñaProject.R --test` prints the 3 test cases to the console instead of opening the app
+if (sys.nframe() == 0 && "--test" %in% commandArgs(trailingOnly = TRUE)){
+  primal <- read_primal_csv(CSV_PATH)
+  cat("CSV read:", nrow(primal$A), "constraints x", ncol(primal$A), "unknowns\n\n")
+  passed <- 0
+  for (case in TEST_CASES){
+    res <- solve_func(case$groups, case$co2_on, case$co2_cap, primal)
+    print_result(case$name, res)
+    if (check_case(case, res)) passed <- passed + 1
+  }
+  cat(passed, "of", length(TEST_CASES), "test cases passed\n")
+  
+  cat("\n--- Invalid input examples ---\n")
+  print_result("No group selected", c(solve_func(character(0), TRUE, 165000, primal), list(groups = "none")))
+  print_result("CO2 cap of 0",      c(solve_func("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
+  quit(save = "no")
+}
+
+# Build the app. If the file was NOT started through shiny::runApp(), launch it right here, so these all work:
+# RStudio "Source" button, source("CerdeñaProject.R"), Rscript CerdeñaProject.R
+app <- shinyApp(ui, server)
+started_by_runApp <- any(vapply(sys.calls(), function(cl) grepl("runApp|shinyAppFile", paste(deparse(cl[[1]]), collapse = "")), logical(1)))
+if (!started_by_runApp) runApp(app, launch.browser = TRUE)
+invisible(app)
