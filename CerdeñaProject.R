@@ -5,12 +5,12 @@
 
 # NEEDS: 
 # 1) install.packages("shiny")
-# 2) "Primal.csv" in the same folder
+# 2) "Primal.csv", "styles.css", "header.html" and "custom_table.html" in the same folder
 
 library(shiny)
 
 # CONSTANTS
-CSV_PATH    <- "Primal.csv" # primal tableau: ALL groups, CO2 cap ON (165,000)
+CSV_PATH    <- "data/Primal.csv" # primal tableau: ALL groups, CO2 cap ON (165,000)
 BLOCK_HOURS <- 4                                              # h: hours per block (prices = S_t / h)
 N_BLOCKS    <- 6
 
@@ -328,6 +328,15 @@ metric_card <- function(label, value, sub = NULL, cls = ""){
       if (!is.null(sub)) div(class = "metric-sub", sub))
 }
 
+# shared table wrapper: the markup lives in custom_table.html, R only fills the placeholders
+#   style = inline CSS for the scroll box, thead / tbody = the <tr> rows (HTML strings)
+table_component <- function(thead, tbody, maxh = NULL){
+  htmlTemplate("ui/custom_table.html",
+               style = HTML(if (is.null(maxh)) "" else paste0("max-height:", maxh, "px")),
+               thead = HTML(thead), tbody = HTML(tbody),
+               document_ = FALSE)
+}
+
 # generic scrollable matrix -> HTML. cls = matrix of css classes for each cell, hcls = css class of each column header
 grid_html <- function(M, rn, cn, cls = NULL, hcls = NULL, corner = "", maxh = 520){
   nr <- nrow(M); nc <- ncol(M)
@@ -339,8 +348,7 @@ grid_html <- function(M, rn, cn, cls = NULL, hcls = NULL, corner = "", maxh = 52
     paste0("<tr><th class='rh'>", esc(rn[i]), "</th>",
            paste0("<td class='", cls[i, ], "'>", M[i, ], "</td>", collapse = ""), "</tr>")
   }, character(1))
-  HTML(paste0("<div class='scroll-box' style='max-height:", maxh, "px'><table class='grid-tbl'><thead>", head,
-              "</thead><tbody>", paste(body, collapse = ""), "</tbody></table></div>"))
+  table_component(head, paste(body, collapse = ""), maxh)
 }
 
 # Dispatch table x_gt (MW) with a colour-intensity heat shading per row
@@ -358,8 +366,7 @@ dispatch_html <- function(d){
   total <- paste0("<tr class='total'><th class='rh'>Total</th>", paste0("<td>", fmt_num(colSums(d)), "</td>", collapse = ""), "</tr>")
   head  <- paste0("<tr><th class='corner'>Plant group</th>",
                   paste0("<th>", colnames(d), "<small>", BLOCK_LABELS, "</small></th>", collapse = ""), "</tr>")
-  HTML(paste0("<div class='scroll-box'><table class='grid-tbl'><thead>", head, "</thead><tbody>",
-              paste(cells, collapse = ""), total, "</tbody></table></div>"))
+  table_component(head, paste0(paste(cells, collapse = ""), total))
 }
 
 prices_html <- function(prices, h = BLOCK_HOURS){
@@ -367,7 +374,7 @@ prices_html <- function(prices, h = BLOCK_HOURS){
   r1   <- paste0("<tr><th class='rh'>Shadow price S<sub>t</sub> (", PESO, ")</th>", paste0("<td>", fmt_fixed(prices * h), "</td>", collapse = ""), "</tr>")
   r2   <- paste0("<tr class='price-row'><th class='rh'>Price = S<sub>t</sub> / ", h, " (", PESO, "/MWh)</th>",
                  paste0("<td>", fmt_fixed(prices), "</td>", collapse = ""), "</tr>")
-  HTML(paste0("<div class='scroll-box'><table class='grid-tbl'><thead>", head, "</thead><tbody>", r1, r2, "</tbody></table></div>"))
+  table_component(head, paste0(r1, r2))
 }
 
 # non-zero shadow prices of ALL constraints + the check  sum(b_i * S_i) = Z
@@ -381,88 +388,17 @@ shadow_html <- function(res){
   rows <- vapply(idx, function(i) paste0("<tr><th class='rh'>S<sub>", i, "</sub> &nbsp;", esc(nm[i]), "</th><td>", fmt_fixed(S[i]),
                                          "</td><td>", fmt_num(b[i]), "</td><td>", fmt_fixed(b[i] * S[i]), "</td></tr>"), character(1))
   tot <- paste0("<tr class='total'><th class='rh'>Sum of b<sub>i</sub> &middot; S<sub>i</sub></th><td></td><td></td><td>", fmt_fixed(sum(b * S)), "</td></tr>")
-  HTML(paste0("<div class='scroll-box' style='max-height:320px'><table class='grid-tbl'><thead><tr><th class='corner'>Constraint (non-zero S<sub>i</sub> only)</th>",
-              "<th>S<sub>i</sub></th><th>RHS b<sub>i</sub></th><th>b<sub>i</sub> &middot; S<sub>i</sub></th></tr></thead><tbody>",
-              paste(rows, collapse = ""), tot, "</tbody></table></div>"))
+  head <- paste0("<tr><th class='corner'>Constraint (non-zero S<sub>i</sub> only)</th>",
+                 "<th>S<sub>i</sub></th><th>RHS b<sub>i</sub></th><th>b<sub>i</sub> &middot; S<sub>i</sub></th></tr>")
+  table_component(head, paste0(paste(rows, collapse = ""), tot), maxh = 320)
 }
 
 # ---- UI ----------------------------------------------------------------------------
-APP_CSS <- "
-:root{ --navy:#0f2540; --navy2:#16355c; --amber:#f5a623; --ink:#1d2a3a; --muted:#6b7a8c; --line:#e3e8ef; --bg:#f3f6fa; }
-body{ background:var(--bg); color:var(--ink); font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif; }
-.container-fluid{ padding:0; }
-.app-header{ background:linear-gradient(120deg,var(--navy) 0%,var(--navy2) 60%,#1e4a7d 100%); color:#fff; padding:18px 28px; border-bottom:4px solid var(--amber); }
-.app-header h1{ margin:0; font-size:26px; font-weight:700; letter-spacing:.2px; }
-.app-header h1 .bolt{ color:var(--amber); margin-right:6px; }
-.app-header p{ margin:4px 0 0; color:#b9c9de; font-size:13.5px; }
-.app-body{ padding:20px 28px 40px; }
-.card-lite{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(15,37,64,.05); }
-.card-lite h4{ margin:0 0 10px; font-size:15px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.6px; }
-.card-lite h4 small{ text-transform:none; letter-spacing:0; font-weight:400; color:var(--muted); margin-left:6px; }
-.step-no{ display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; border-radius:50%; background:var(--amber); color:var(--navy); font-size:12px; font-weight:800; margin-right:8px; }
-.shiny-input-container{ width:100% !important; max-width:100%; }
-.checkbox{ margin:4px 0; }
-.checkbox label{ display:flex; align-items:center; width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:#fafcff; cursor:pointer; font-weight:500; }
-.checkbox label:hover{ border-color:var(--amber); background:#fff9ee; }
-.checkbox label>span{ display:flex; align-items:center; flex:1; }
-.checkbox input[type=checkbox]{ margin:0 10px 0 0 !important; position:static; }
-.dot{ display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:8px; flex:none; }
-.cap{ margin-left:auto; color:var(--muted); font-size:12px; font-weight:400; padding-left:8px; }
-.btn-row{ display:flex; gap:8px; margin:8px 0 2px; }
-.btn-row .btn{ flex:1; }
-.btn-soft{ background:#eef3f9; border:1px solid var(--line); color:var(--navy); font-weight:600; }
-.btn-soft:hover{ background:#e2ebf5; }
-#solve{ width:100%; background:var(--amber); border:none; color:var(--navy); font-weight:800; font-size:16px; padding:12px; border-radius:10px; letter-spacing:.4px; }
-#solve:hover{ background:#ffb83d; }
-.co2-note{ color:var(--muted); font-size:12.5px; margin:4px 0 0; }
-.test-row .btn{ font-size:12.5px; padding:4px 8px; }
-.nav-tabs{ border-bottom:2px solid var(--line); }
-.nav-tabs>li>a{ color:var(--muted); font-weight:700; border:none !important; border-bottom:3px solid transparent !important; margin-right:6px; }
-.nav-tabs>li.active>a, .nav-tabs>li.active>a:hover, .nav-tabs>li.active>a:focus{ color:var(--navy); background:transparent; border-bottom:3px solid var(--amber) !important; }
-.tab-content{ padding-top:16px; }
-.alert-box{ border-radius:12px; padding:14px 18px; margin-bottom:16px; border:1px solid; }
-.alert-box.ok{ background:#e9f8ef; border-color:#a8dfbd; color:#14532d; }
-.alert-box.bad{ background:#fdecec; border-color:#f3b4b4; color:#7f1d1d; }
-.alert-box.warn{ background:#fff6e0; border-color:#f3d28a; color:#6b4a00; }
-.alert-box.info{ background:#eaf2fc; border-color:#b7d0f0; color:#17406f; }
-.alert-title{ font-size:17px; font-weight:800; } .alert-body{ margin-top:3px; font-size:14px; }
-.metrics{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
-.metric{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; border-top:4px solid var(--navy2); }
-.metric.main{ border-top-color:var(--amber); grid-column:span 2; }
-.metric-label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); font-weight:700; }
-.metric-value{ font-size:26px; font-weight:800; color:var(--navy); line-height:1.25; word-break:break-all; }
-.metric-sub{ font-size:12px; color:var(--muted); }
-.scroll-box{ overflow:auto; max-width:100%; border:1px solid var(--line); border-radius:8px; }
-.grid-tbl{ border-collapse:separate; border-spacing:0; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
-.grid-tbl th, .grid-tbl td{ padding:6px 10px; border-bottom:1px solid #eef1f5; border-right:1px solid #f1f4f8; text-align:right; white-space:nowrap; }
-.grid-tbl thead th{ position:sticky; top:0; background:var(--navy); color:#fff; z-index:2; font-weight:600; text-align:center; }
-.grid-tbl thead th small{ display:block; font-weight:400; font-size:10.5px; color:#b9c9de; }
-.grid-tbl th.rh{ position:sticky; left:0; background:#f6f8fb; text-align:left; font-weight:600; z-index:1; border-right:2px solid var(--line); }
-.grid-tbl thead th.corner{ left:0; z-index:3; text-align:left; background:var(--navy2); }
-.grid-tbl tr.total td, .grid-tbl tr.total th{ background:#eef3f9; font-weight:700; }
-.grid-tbl tr.price-row td{ background:#fff7e6; font-weight:800; color:var(--navy); font-size:14px; }
-.grid-tbl tr.price-row th{ background:#fff1d1; }
-.grid-tbl thead th.hS{ background:#7a3b0c; } .grid-tbl thead th.hX{ background:var(--navy); } .grid-tbl thead th.hZ{ background:#2c3e50; }
-.grid-tbl td.prow{ background:#fff3d6; } .grid-tbl td.pcol{ background:#e1effd; } .grid-tbl td.pcell{ background:var(--amber); color:#000; font-weight:800; }
-.grid-tbl td.neg{ color:#c0152f; font-weight:700; } .grid-tbl td.nz{ background:#e9f8ef; font-weight:700; }
-.grid-tbl td.zero{ color:#b6c0cc; }
-.pivot-info{ font-size:13.5px; background:#fff; border:1px solid var(--line); border-left:5px solid var(--amber); border-radius:8px; padding:9px 14px; margin-bottom:12px; }
-.iter-ctrl{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
-.iter-ctrl .btn{ font-weight:700; }
-.irs--shiny .irs-bar{ background:var(--amber); border-color:var(--amber); } .irs--shiny .irs-handle{ border-color:var(--navy); }
-.legend-line{ font-size:12px; color:var(--muted); margin:8px 0 0; }
-.legend-line span.sw{ display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin:0 4px 0 10px; }
-.muted{ color:var(--muted); }
-.welcome ol{ padding-left:20px; } .welcome li{ margin-bottom:5px; }
-.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:1100px){ .two-col{ grid-template-columns:1fr; } }
-"
 
 ui <- fluidPage(
   title = "Luzon Grid Dispatch Simulator",
-  tags$head(tags$style(HTML(APP_CSS))),
-  div(class = "app-header",
-      h1(span(class = "bolt", HTML("&#9889;")), "Luzon Grid Dispatch & Price Simulator"),
-      p("Cheapest way to run the Luzon power plants for one day \u00b7 solved with the simplex method on the dual \u00b7 CMSC 150")),
+  tags$head(includeCSS("ui/styles.css")),   # stylesheet: styles.css
+  includeHTML("ui/header.html"),            # header component: header.html
   div(class = "app-body",
       sidebarLayout(
         sidebarPanel(width = 4,
@@ -484,7 +420,7 @@ ui <- fluidPage(
                                           p(class = "co2-note", "Default 165,000 t. Must be greater than 0."))),
                      div(class = "card-lite",
                          h4(span(class = "step-no", "3"), "Solve"),
-                         actionButton("solve", HTML("&#9889; Find cheapest dispatch")),
+                         actionButton("solve", HTML("Find cheapest dispatch")),
                          hr(style = "margin:14px 0 8px"),
                          p(class = "muted", style = "font-size:12.5px; margin:0 0 6px", "Quick-load a sample case (then press Solve):"),
                          div(class = "btn-row test-row",
