@@ -415,8 +415,7 @@ ui <- fluidPage(
                          h4(span(class = "step-no", "2"), "CO\u2082 cap"),
                          checkboxInput("co2_on", "Limit daily CO\u2082 emissions", value = FALSE),
                          conditionalPanel("input.co2_on",
-                                          numericInput("co2_cap", "Limit (t CO\u2082 / day)", value = 165000, min = 0, step = 1000),
-                                          p(class = "co2-note", "Default 165,000 t. Must be greater than 0."))),
+                                          numericInput("co2_cap", "Limit (t CO\u2082 / day)", value = 165000, min = 0, step = 1000)
                      div(class = "card-lite",
                          h4(span(class = "step-no", "3"), "Solve"),
                          actionButton("solve", HTML("SOLVE")),
@@ -559,10 +558,9 @@ server <- function(input, output, session){
               actionButton("iter_first", HTML("&#9198; First"), class = "btn-soft"),
               actionButton("iter_prev",  HTML("&#9664; Prev"),  class = "btn-soft"),
               actionButton("iter_next",  HTML("Next &#9654;"),  class = "btn-soft"),
-              actionButton("iter_last",  HTML("Last &#9197;"),  class = "btn-soft"),
-              span(class = "muted", style = "margin-left:8px", "Use the slider, the buttons, or press \u25b6 under the slider to play.")),
+              actionButton("iter_last",  HTML("Last &#9197;"),  class = "btn-soft")),
           sliderInput("iter", "Iteration", min = 0, max = N, value = 0, step = 1, width = "100%",
-                      animate = animationOptions(interval = 700, loop = FALSE))),
+                      animate = animationOptions(interval = 1000, loop = FALSE))),
       uiOutput("tableau_view"))
   })
   
@@ -583,8 +581,8 @@ server <- function(input, output, session){
     #   
     info <- if (!is.na(pr)){ 
       pe <- tab[pr, pc]
-      paste0("Pivot column: <b>", esc(colnames(tab)[pc]), "</b> (most negative bottom-row entry, ", fmt_num(tab[nr, pc], 4), ") &nbsp;\u00b7&nbsp; ",
-             "Pivot row: <b>", esc(rownames(tab)[pr]), "</b> (smallest test ratio, ", fmt_num(tab[pr, nc] / pe, 4), ") &nbsp;\u00b7&nbsp; ",
+      paste0("Pivot column: <b>", esc(colnames(tab)[pc]), "</b> &nbsp;\u00b7&nbsp; ",
+             "Pivot row: <b>", esc(rownames(tab)[pr]), "</b> &nbsp;\u00b7&nbsp; ",
              "Pivot element: <b>", fmt_num(pe, 4), "</b>")
     } else if (!is.na(pc)){
       paste0("<b>Infeasible.</b> Pivot column <b>", esc(colnames(tab)[pc]), "</b> has no positive entry, so there is no test ratio to choose from.")
@@ -608,7 +606,7 @@ server <- function(input, output, session){
     tagList(
       div(class = "pivot-info", HTML(paste0("<b>Iteration ", h$iteration, " of ", length(hist) - 1, "</b> &nbsp;|&nbsp; ", info))),
       div(class = "card-lite",
-          h4("Simplex tableau", tags$small("iteration ", h$iteration)),
+          h4("Simplex tableau"),
           grid_html(matrix(fmt_num(tab, 4), nr, nc), rownames(tab), colnames(tab), cls, hcls, corner = "Row \\ Column", maxh = 560),
           p(class = "legend-line",
             tags$span(class = "sw", style = "background:#7a3b0c"), "S", tags$sub("i"), " columns (dual variables / shadow prices)",
