@@ -580,8 +580,8 @@ server <- function(input, output, session){
     nr <- nrow(tab); nc <- ncol(tab); m <- res$num_constraints; n <- res$num_unknowns
     pr <- h$pivotRow; pc <- h$pivotCol
     
-    # what happens at this iteration
-    info <- if (!is.na(pr)){
+    #   
+    info <- if (!is.na(pr)){ 
       pe <- tab[pr, pc]
       paste0("Pivot column: <b>", esc(colnames(tab)[pc]), "</b> (most negative bottom-row entry, ", fmt_num(tab[nr, pc], 4), ") &nbsp;\u00b7&nbsp; ",
              "Pivot row: <b>", esc(rownames(tab)[pr]), "</b> (smallest test ratio, ", fmt_num(tab[pr, nc] / pe, 4), ") &nbsp;\u00b7&nbsp; ",
