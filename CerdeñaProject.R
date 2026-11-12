@@ -415,7 +415,7 @@ ui <- fluidPage(
                          h4(span(class = "step-no", "2"), "CO\u2082 cap"),
                          checkboxInput("co2_on", "Limit daily CO\u2082 emissions", value = FALSE),
                          conditionalPanel("input.co2_on",
-                                          numericInput("co2_cap", "Limit (t CO\u2082 / day)", value = 165000, min = 0, step = 1000)
+                                          numericInput("co2_cap", "Limit (t CO\u2082 / day)", value = 165000, min = 0, step = 1000))),
                      div(class = "card-lite",
                          h4(span(class = "step-no", "3"), "Solve"),
                          actionButton("solve", HTML("SOLVE")),
