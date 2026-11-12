@@ -409,7 +409,7 @@ ui <- fluidPage(
                                                           "<span class='cap'>", format(GROUP_CAP[g], big.mark = ","), " MW</span>"))),
                                             choiceValues = names(GROUP_KEYS)),
                          div(class = "btn-row",
-                             actionButton("check_all", "Check All", class = "btn-soft"),
+                               actionButton("check_all", "Check All", class = "btn-soft"),
                              actionButton("reset", "Reset", class = "btn-soft"))),
                      div(class = "card-lite",
                          h4(span(class = "step-no", "2"), "CO\u2082 cap"),
@@ -420,7 +420,7 @@ ui <- fluidPage(
                          h4(span(class = "step-no", "3"), "Solve"),
                          actionButton("solve", HTML("SOLVE")),
                          hr(style = "margin:14px 0 8px"),
-                         p(class = "muted", style = "font-size:12.5px; margin:0 0 6px", "Quick-load a sample case (then press Solve):"),
+                         p(class = "muted", style = "font-size:12.5px; margin:0 0 6px", "Pre-loaded Test Cases:"),
                          div(class = "btn-row test-row",
                              actionButton("tc1", "Test #1", class = "btn-soft"),
                              actionButton("tc2", "Test #2", class = "btn-soft"),
@@ -549,7 +549,7 @@ server <- function(input, output, session){
   output$tableau_tab <- renderUI({
     res <- rv$res
     if (is.null(res) || is.null(res$history)){
-      return(alert_box("info", "No tableau yet", "Run the solver (or fix the input) to see the simplex tableau of every iteration here."))
+      return(alert_box("bad", "No tableau yet", "Press SOLVE to get the iteratons of the Simplex Tableau."))
     }
     N <- length(res$history) - 1
     tagList(
@@ -615,7 +615,7 @@ server <- function(input, output, session){
             tags$span(class = "sw", style = "background:#e1effd;border:1px solid #ddd"), "pivot column",
             tags$span(class = "sw", style = "background:#f5a623"), "pivot element")),
       div(class = "card-lite",
-          h4("Basic solution", tags$small("iteration ", h$iteration, " \u00b7 read from the bottom row; the Z column shows Z")),
+          h4("Basic solution"),
           grid_html(matrix(fmt_num(unname(bs), 4), 1, length(bs)), "Basic Solution", names(bs), bs_cls, hcls[-length(hcls)], corner = "", maxh = 140)))
   })
 }
