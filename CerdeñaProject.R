@@ -1,11 +1,11 @@
 # Fritz Benedict C. Cerdeña | 2025 - 06390
 
-# Pipeline:  primal tableau (CSV)  ->  pick groups / CO2 toggle  ->  transpose + slack + Z
+# Pipeline:  primal tableau (in CSV)  ->  pick groups / CO2 toggle  ->  transpose + slack + Z
 # ->  Simplex()  ->  Z, iterations, dispatch x_gt, prices S_t / h   ->  R Shiny UI
 
 # NEEDS: 
 # 1) install.packages("shiny")
-# 2) "Primal.csv", "styles.css", "header.html" and "custom_table.html" in the same folder
+# 2) put "data/Primal.csv" ->, "ui/styles.css", "ui/header.html" and "ui/custom_table.html" in their respective folder
 
 library(shiny)
 
@@ -475,11 +475,11 @@ server <- function(input, output, session){
           metric_card("Unknowns", res$num_unknowns), # Xnt variables
           metric_card("Constraints", res$num_constraints)),
       div(class = "card-lite", h4("Output of each plant group"), dispatch_html(res$dispatch)),
-      div(class = "card-lite", h4("Price of electricity"),
+      div(class = "card-lite", h4("Price of electricity"), prices_html(res$prices)),
       div(class = "card-lite",
           h4("Shadow prices & check"),
           shadow_html(res))
-            ))
+            )
   })
   
   demand <- reactive(if (is.null(primal)) NULL else unname(primal$b[paste0("Demand_B", 1:N_BLOCKS)]))
