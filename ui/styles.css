@@ -18,6 +18,7 @@ body {
   padding: 0;
 }
 
+/* header */
 .app-header {
   background: linear-gradient(120deg,var(--navy) 0%,var(--navy2) 60%,#255080 100%);
   color: #fff;
@@ -47,6 +48,7 @@ body {
   padding: 20px 28px 40px;
 }
 
+/* cards */
 .card-lite {
   background: #fff;
   border: 1px solid var(--line);
@@ -92,6 +94,7 @@ body {
   max-width: 100%;
 }
 
+/* checkboxes */
 .checkbox {
   margin: 4px 0;
 }
@@ -141,6 +144,7 @@ body {
   padding-left: 8px;
 }
 
+/* buttons */
 .btn-row {
   display: flex;
   gap: 8px;
@@ -162,6 +166,7 @@ body {
   background: #e2ebf5;
 }
 
+/* solve button */
 #solve {
   width: 100%;
   background: var(--amber);
@@ -178,11 +183,13 @@ body {
   background: #ffb83d;
 }
 
+/* test row buttons */s
 .test-row .btn {
   font-size: 12.5px;
   padding: 4px 8px;
 }
 
+/* tabs */
 .nav-tabs {
   border-bottom: 2px solid var(--line);
 }
@@ -195,6 +202,7 @@ body {
   margin-right: 6px;
 }
 
+/* active tab */
 .nav-tabs>li.active>a,
 .nav-tabs>li.active>a:hover,
 .nav-tabs>li.active>a:focus {
@@ -207,6 +215,7 @@ body {
   padding-top: 16px;
 }
 
+/* alert boxes */
 .alert-box {
   border-radius: 12px;
   padding: 14px 18px;
@@ -296,6 +305,7 @@ body {
   border-radius: 8px;
 }
 
+/* tables */
 .grid-tbl {
   border-collapse: separate;
   border-spacing: 0;
@@ -414,6 +424,7 @@ body {
   margin-bottom: 12px;
 }
 
+/* iteration control/sliders */
 .iter-ctrl {
   display: flex;
   gap: 8px;
@@ -422,8 +433,13 @@ body {
   margin-bottom: 6px;
 }
 
-.iter-ctrl .btn {
+.iter-ctrl .btn { 
   font-weight: 700;
+}
+
+/* slider button */
+.shiny-input-container .slider-animate-container {
+  margin-top: 8px;
 }
 
 .irs--shiny .irs-bar {
@@ -435,6 +451,7 @@ body {
   border-color: var(--navy);
 }
 
+/* simplex tab legends */
 .legend-line {
   font-size: 12px;
   color: var(--muted);
@@ -445,7 +462,7 @@ body {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: 4px;
   vertical-align: -2px;
   margin: 0 4px 0 10px;
 }
@@ -466,10 +483,4 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-}
-
-@media(max-width:1100px) {
-  .two-col {
-    grid-template-columns: 1fr;
-  }
 }

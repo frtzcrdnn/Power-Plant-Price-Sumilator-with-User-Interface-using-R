@@ -472,37 +472,17 @@ server <- function(input, output, session){
       div(class = "metrics",
           metric_card("Total minimum cost, Z", paste0(PESO, fmt_fixed(res$Z)), "for one day", "main"),
           metric_card("Iterations", res$iterations),
-          metric_card("Unknowns", res$num_unknowns, "x\u2099\u209c variables"), # Xnt variables
+          metric_card("Unknowns", res$num_unknowns), # Xnt variables
           metric_card("Constraints", res$num_constraints)),
-      div(class = "card-lite", h4("Output of each plant group", tags$small("x", tags$sub("gt"), " in MW")), dispatch_html(res$dispatch)),
-      div(class = "card-lite", h4("Price of electricity", tags$small("by block, ", PESO, " per MWh")), prices_html(res$prices)),
+      div(class = "card-lite", h4("Output of each plant group"), dispatch_html(res$dispatch)),
+      div(class = "card-lite", h4("Price of electricity"),
       div(class = "card-lite",
           h4("Shadow prices & check"),
           shadow_html(res))
-            )
+            ))
   })
   
   demand <- reactive(if (is.null(primal)) NULL else unname(primal$b[paste0("Demand_B", 1:N_BLOCKS)]))
-  
-  # output$plot_dispatch <- renderPlot({
-  #   res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
-  #   d <- res$dispatch; cols <- GROUP_COLORS[rownames(d)]; dem <- demand()
-  #   par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
-  #   bp <- barplot(d, col = cols, border = NA, ylab = "Power (MW)", las = 1,
-  #                 ylim = c(0, max(colSums(d), dem) * 1.28), names.arg = paste0(colnames(d), "\n", BLOCK_LABELS), cex.names = 0.8)
-  #   lines(bp, dem, type = "b", pch = 19, lwd = 2.5, col = "#c0152f")
-  #   legend("top", legend = c(rownames(d), "Demand"), ncol = 4, bty = "n", cex = 0.8, pt.cex = 1.4,
-  #          pch = c(rep(15, nrow(d)), 19), col = c(cols, "#c0152f"), lty = c(rep(NA, nrow(d)), 1))
-  # })
-  
-  # output$plot_price <- renderPlot({
-  #   res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
-  #   p <- res$prices
-  #   par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
-  #   bp <- barplot(p, col = "#f5a623", border = NA, las = 1, ylim = c(0, max(p) * 1.18),
-  #                 ylab = paste0("Price (PHP / MWh)"), names.arg = paste0(names(p), "\n", BLOCK_LABELS), cex.names = 0.8)
-  #   text(bp, p, labels = fmt_fixed(p), pos = 3, cex = 0.8, font = 2, col = "#0f2540")
-  # })
   
   # ---- Simplex Tableau tab ----
   output$tableau_tab <- renderUI({
@@ -568,11 +548,11 @@ server <- function(input, output, session){
           h4("Simplex tableau"),
           grid_html(matrix(fmt_num(tab, 4), nr, nc), rownames(tab), colnames(tab), cls, hcls, corner = "Row \\ Column", maxh = 560),
           p(class = "legend-line",
-            tags$span(class = "sw", style = "background:#7a3b0c"), "S", tags$sub("i"), " columns (dual variables / shadow prices)",
-            tags$span(class = "sw", style = "background:#0f2540"), "slack columns = original unknowns x", tags$sub("gt"),
-            tags$span(class = "sw", style = "background:#fff3d6;border:1px solid #ddd"), "pivot row",
-            tags$span(class = "sw", style = "background:#e1effd;border:1px solid #ddd"), "pivot column",
-            tags$span(class = "sw", style = "background:#f5a623"), "pivot element")),
+            tags$span(class = "sw", style = "background:#7a3b0c"), "Shadow Prices",
+            tags$span(class = "sw", style = "background:#0f2540"), "Slack/Unknowns",
+            tags$span(class = "sw", style = "background:#fff3d6;border:1px solid #ddd"), "Pivot Row",
+            tags$span(class = "sw", style = "background:#e1effd;border:1px solid #ddd"), "Pivot Column",
+            tags$span(class = "sw", style = "background:#f5a623"), "Pivot Element")),
       div(class = "card-lite",
           h4("Basic solution"),
           grid_html(matrix(fmt_num(unname(bs), 4), 1, length(bs)), "Basic Solution", names(bs), bs_cls, hcls[-length(hcls)], corner = "", maxh = 140)))
