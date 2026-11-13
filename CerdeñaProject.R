@@ -249,34 +249,9 @@ solve_func <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, primal 
     out$check_sum_bS <- sum(built$b * S)                       # must equal Z
     out$final_tableau <- res$finalTableau
   }
+  
   if (keepHistory) out$history <- res$history
   return(out)
-}
-
-# prints test cases
-print_result <- function(name, res){
-  cat("=====", name, "=====\n")
-  cat("Plant groups :", paste(res$groups, collapse = ", "), "\n")
-  cat("CO2 cap      :", if (isTRUE(res$co2_on)) paste0("ON (", format(res$co2_cap, big.mark = ","), " t/day)") else "OFF", "\n")
-  if (res$status == "invalid"){ cat("Invalid input:", res$message, "\n\n"); return(invisible()) }
-  cat("LP setup     :", res$num_unknowns, "unknowns,", res$num_constraints, "constraints\n")
-  cat("Iterations   :", res$iterations, "\n")
-  if (res$status == "infeasible"){ cat("Result       : The problem is infeasible.\n\n"); return(invisible()) }
-  cat("Total minimum cost, Z :", format(res$Z, big.mark = ",", nsmall = 2), "\n")
-  cat("Unknowns x_gt (MW):\n");              print(round(res$dispatch, 2))
-  cat("Price = S_t / 4 (PHP/MWh):\n");       print(round(res$prices, 2))
-  cat("Check sum(b * S) - Z =", format(res$check_sum_bS - res$Z, digits = 3), "\n\n")
-}
-
-check_case <- function(case, res){
-  ok <- res$status == case$status && res$iterations == case$iterations
-  if (case$status == "optimal"){
-    ok <- ok && abs(res$Z - case$Z) / case$Z < 1e-4 &&                      # within 0.01 %
-      all(abs(res$prices - case$prices) <= 0.01) &&               # within 0.01 PHP/MWh
-      abs(res$check_sum_bS - res$Z) / res$Z < 1e-9
-  }
-  cat(if (ok) "PASS" else "FAIL", "-", case$name, "\n\n")
-  return(ok)
 }
 
 TEST_CASES <- list(
@@ -293,8 +268,6 @@ TEST_CASES <- list(
 # =====================================================================================
 #                                    R SHINY USER INTERFACE
 # =====================================================================================
-
-`%||%` <- function(a, b) if (is.null(a)) b else a
 
 PESO <- "\u20b1"  # peso sign 
 # display-only info for the UI (the numbers used by the solver all come from Primal.csv)
@@ -376,7 +349,7 @@ prices_html <- function(prices, h = BLOCK_HOURS){
   table_component(head, paste0(r1, r2))
 }
 
-# non-zero shadow prices of ALL constraints + the check  sum(b_i * S_i) = Z
+# non-zero shadow prices of ALL constraints
 shadow_html <- function(res){
   m   <- res$num_constraints
   S   <- shadow_prices(res$final_tableau, m)
@@ -386,10 +359,9 @@ shadow_html <- function(res){
   if (length(idx) == 0) return(HTML("<p class='muted'>All shadow prices are 0.</p>"))
   rows <- vapply(idx, function(i) paste0("<tr><th class='rh'>S<sub>", i, "</sub> &nbsp;", esc(nm[i]), "</th><td>", fmt_fixed(S[i]),
                                          "</td><td>", fmt_num(b[i]), "</td><td>", fmt_fixed(b[i] * S[i]), "</td></tr>"), character(1))
-  tot <- paste0("<tr class='total'><th class='rh'>Sum of b<sub>i</sub> &middot; S<sub>i</sub></th><td></td><td></td><td>", fmt_fixed(sum(b * S)), "</td></tr>")
   head <- paste0("<tr><th class='corner'>Constraint (non-zero S<sub>i</sub> only)</th>",
                  "<th>S<sub>i</sub></th><th>RHS b<sub>i</sub></th><th>b<sub>i</sub> &middot; S<sub>i</sub></th></tr>")
-  table_component(head, paste0(paste(rows, collapse = ""), tot), maxh = 320)
+  table_component(head, paste0(paste(rows, collapse = "")), maxh = 320)
 }
 
 # ---- UI ----------------------------------------------------------------------------
@@ -487,19 +459,11 @@ server <- function(input, output, session){
     }
     if (res$status == "invalid") return(alert_box("warn", "Invalid input", res$message))
     if (res$status == "error")   return(alert_box("bad", "Unable to solve", res$message))
-    
-    setup <- div(class = "card-lite",
-                 h4("Linear programming setup"),
-                 p(style = "margin:0", tags$b(res$num_unknowns), " unknowns (x", tags$sub("gt"), ") \u00b7 ", tags$b(res$num_constraints), " constraints \u00b7 groups: ",
-                   paste(res$groups, collapse = ", "), " \u00b7 CO\u2082 cap: ",
-                   if (isTRUE(res$co2_on)) paste0("ON (", format(res$co2_cap, big.mark = ","), " t/day)") else "OFF"))
-    
     if (res$status == "infeasible"){
       return(tagList(
         alert_box("bad", "The problem is infeasible.",
                   paste0("The selected plants cannot meet demand in every block under these limits (no test ratio could be chosen). Number of iterations: ", res$iterations, ".")),
         div(class = "metrics", metric_card("Iterations", res$iterations), metric_card("Unknowns", res$num_unknowns), metric_card("Constraints", res$num_constraints)),
-        setup,
         p(class = "muted", "Tip: select more plant groups, or raise / switch off the CO\u2082 cap. The Simplex Tableau tab shows where the algorithm got stuck.")))
     }
     
@@ -513,37 +477,33 @@ server <- function(input, output, session){
       div(class = "card-lite", h4("Output of each plant group", tags$small("x", tags$sub("gt"), " in MW")), dispatch_html(res$dispatch)),
       div(class = "card-lite", h4("Price of electricity", tags$small("by block, ", PESO, " per MWh")), prices_html(res$prices)),
       div(class = "two-col",
-          div(class = "card-lite", h4("Dispatch chart"), plotOutput("plot_dispatch", height = "300px")),
-          div(class = "card-lite", h4("Price chart"),    plotOutput("plot_price",    height = "300px"))),
       div(class = "card-lite",
-          h4("Shadow prices & check", tags$small("sum of b", tags$sub("i"), " \u00b7 S", tags$sub("i"), " = Z")),
-          shadow_html(res),
-          p(class = "legend-line", "Check: \u03a3 b", tags$sub("i"), "\u00b7S", tags$sub("i"), " = ", PESO, fmt_fixed(res$check_sum_bS),
-            " and Z = ", PESO, fmt_fixed(res$Z), if (abs(res$check_sum_bS - res$Z) / abs(res$Z) < 1e-9) "  \u2713 they match" else "  (mismatch)")),
-      setup)
+          h4("Shadow prices & check"),
+          shadow_html(res))
+            ))
   })
   
   demand <- reactive(if (is.null(primal)) NULL else unname(primal$b[paste0("Demand_B", 1:N_BLOCKS)]))
   
-  output$plot_dispatch <- renderPlot({
-    res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
-    d <- res$dispatch; cols <- GROUP_COLORS[rownames(d)]; dem <- demand()
-    par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
-    bp <- barplot(d, col = cols, border = NA, ylab = "Power (MW)", las = 1,
-                  ylim = c(0, max(colSums(d), dem) * 1.28), names.arg = paste0(colnames(d), "\n", BLOCK_LABELS), cex.names = 0.8)
-    lines(bp, dem, type = "b", pch = 19, lwd = 2.5, col = "#c0152f")
-    legend("top", legend = c(rownames(d), "Demand"), ncol = 4, bty = "n", cex = 0.8, pt.cex = 1.4,
-           pch = c(rep(15, nrow(d)), 19), col = c(cols, "#c0152f"), lty = c(rep(NA, nrow(d)), 1))
-  })
+  # output$plot_dispatch <- renderPlot({
+  #   res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
+  #   d <- res$dispatch; cols <- GROUP_COLORS[rownames(d)]; dem <- demand()
+  #   par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
+  #   bp <- barplot(d, col = cols, border = NA, ylab = "Power (MW)", las = 1,
+  #                 ylim = c(0, max(colSums(d), dem) * 1.28), names.arg = paste0(colnames(d), "\n", BLOCK_LABELS), cex.names = 0.8)
+  #   lines(bp, dem, type = "b", pch = 19, lwd = 2.5, col = "#c0152f")
+  #   legend("top", legend = c(rownames(d), "Demand"), ncol = 4, bty = "n", cex = 0.8, pt.cex = 1.4,
+  #          pch = c(rep(15, nrow(d)), 19), col = c(cols, "#c0152f"), lty = c(rep(NA, nrow(d)), 1))
+  # })
   
-  output$plot_price <- renderPlot({
-    res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
-    p <- res$prices
-    par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
-    bp <- barplot(p, col = "#f5a623", border = NA, las = 1, ylim = c(0, max(p) * 1.18),
-                  ylab = paste0("Price (PHP / MWh)"), names.arg = paste0(names(p), "\n", BLOCK_LABELS), cex.names = 0.8)
-    text(bp, p, labels = fmt_fixed(p), pos = 3, cex = 0.8, font = 2, col = "#0f2540")
-  })
+  # output$plot_price <- renderPlot({
+  #   res <- rv$res; req(!is.null(res), identical(res$status, "optimal"))
+  #   p <- res$prices
+  #   par(mar = c(3.5, 6, 1, 1), mgp = c(4.2, 1, 0), family = "sans")
+  #   bp <- barplot(p, col = "#f5a623", border = NA, las = 1, ylim = c(0, max(p) * 1.18),
+  #                 ylab = paste0("Price (PHP / MWh)"), names.arg = paste0(names(p), "\n", BLOCK_LABELS), cex.names = 0.8)
+  #   text(bp, p, labels = fmt_fixed(p), pos = 3, cex = 0.8, font = 2, col = "#0f2540")
+  # })
   
   # ---- Simplex Tableau tab ----
   output$tableau_tab <- renderUI({
@@ -623,24 +583,10 @@ server <- function(input, output, session){
 # =====================================================================================
 #                                       LAUNCH PROGRAM
 # =====================================================================================
-  
-primal <- read_primal_csv(CSV_PATH)
-cat("CSV read:", nrow(primal$A), "constraints x", ncol(primal$A), "unknowns\n\n")
-passed <- 0
-for (case in TEST_CASES){
-  res <- solve_func(case$groups, case$co2_on, case$co2_cap, primal)
-  print_result(case$name, res)
-  if (check_case(case, res)) passed <- passed + 1
-}
-cat(passed, "of", length(TEST_CASES), "test cases passed\n")
 
-cat("\n--- Invalid input examples ---\n")
-print_result("No group selected", c(solve_func(character(0), TRUE, 165000, primal), list(groups = "none")))
-print_result("CO2 cap of 0",      c(solve_func("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
+# Build the app. If the file was NOT started through shiny::runApp(), launch it right 
 
-# Build the app. If the file was NOT started through shiny::runApp(), launch it right here, so these all work:
-# RStudio "Source" button, source("CerdeñaProject.R"), Rscript CerdeñaProject.R
-app <- shinyApp(ui, server)
+app <- shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))
 started_by_runApp <- any(vapply(sys.calls(), function(cl) grepl("runApp|shinyAppFile", paste(deparse(cl[[1]]), collapse = "")), logical(1)))
 if (!started_by_runApp) runApp(app, launch.browser = TRUE)
 invisible(app)
