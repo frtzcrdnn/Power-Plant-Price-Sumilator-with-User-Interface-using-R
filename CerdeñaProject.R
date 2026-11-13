@@ -249,7 +249,7 @@ solve_func <- function(selected_groups, co2_on = TRUE, co2_cap = 165000, primal 
     out$check_sum_bS <- sum(built$b * S)                       # must equal Z
     out$final_tableau <- res$finalTableau
   }
-  
+
   if (keepHistory) out$history <- res$history
   return(out)
 }
@@ -476,11 +476,10 @@ server <- function(input, output, session){
           metric_card("Constraints", res$num_constraints)),
       div(class = "card-lite", h4("Output of each plant group", tags$small("x", tags$sub("gt"), " in MW")), dispatch_html(res$dispatch)),
       div(class = "card-lite", h4("Price of electricity", tags$small("by block, ", PESO, " per MWh")), prices_html(res$prices)),
-      div(class = "two-col",
       div(class = "card-lite",
           h4("Shadow prices & check"),
           shadow_html(res))
-            ))
+            )
   })
   
   demand <- reactive(if (is.null(primal)) NULL else unname(primal$b[paste0("Demand_B", 1:N_BLOCKS)]))
