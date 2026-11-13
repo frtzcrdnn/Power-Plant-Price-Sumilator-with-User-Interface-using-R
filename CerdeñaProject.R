@@ -409,7 +409,7 @@ ui <- fluidPage(
                                                           "<span class='cap'>", format(GROUP_CAP[g], big.mark = ","), " MW</span>"))),
                                             choiceValues = names(GROUP_KEYS)),
                          div(class = "btn-row",
-                               actionButton("check_all", "Check All", class = "btn-soft"),
+                             actionButton("check_all", "Check All", class = "btn-soft"),
                              actionButton("reset", "Reset", class = "btn-soft"))),
                      div(class = "card-lite",
                          h4(span(class = "step-no", "2"), "CO\u2082 cap"),
@@ -621,26 +621,22 @@ server <- function(input, output, session){
 }
 
 # =====================================================================================
-#                                       LAUNCH
+#                                       LAUNCH PROGRAM
 # =====================================================================================
-
-# `Rscript CerdeñaProject.R --test` prints the 3 test cases to the console instead of opening the app
-if (sys.nframe() == 0 && "--test" %in% commandArgs(trailingOnly = TRUE)){
-  primal <- read_primal_csv(CSV_PATH)
-  cat("CSV read:", nrow(primal$A), "constraints x", ncol(primal$A), "unknowns\n\n")
-  passed <- 0
-  for (case in TEST_CASES){
-    res <- solve_func(case$groups, case$co2_on, case$co2_cap, primal)
-    print_result(case$name, res)
-    if (check_case(case, res)) passed <- passed + 1
-  }
-  cat(passed, "of", length(TEST_CASES), "test cases passed\n")
   
-  cat("\n--- Invalid input examples ---\n")
-  print_result("No group selected", c(solve_func(character(0), TRUE, 165000, primal), list(groups = "none")))
-  print_result("CO2 cap of 0",      c(solve_func("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
-  quit(save = "no")
+primal <- read_primal_csv(CSV_PATH)
+cat("CSV read:", nrow(primal$A), "constraints x", ncol(primal$A), "unknowns\n\n")
+passed <- 0
+for (case in TEST_CASES){
+  res <- solve_func(case$groups, case$co2_on, case$co2_cap, primal)
+  print_result(case$name, res)
+  if (check_case(case, res)) passed <- passed + 1
 }
+cat(passed, "of", length(TEST_CASES), "test cases passed\n")
+
+cat("\n--- Invalid input examples ---\n")
+print_result("No group selected", c(solve_func(character(0), TRUE, 165000, primal), list(groups = "none")))
+print_result("CO2 cap of 0",      c(solve_func("Coal", TRUE, 0, primal), list(groups = "Coal", co2_on = TRUE, co2_cap = 0)))
 
 # Build the app. If the file was NOT started through shiny::runApp(), launch it right here, so these all work:
 # RStudio "Source" button, source("CerdeñaProject.R"), Rscript CerdeñaProject.R
