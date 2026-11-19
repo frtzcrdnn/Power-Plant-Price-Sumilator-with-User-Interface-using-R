@@ -451,11 +451,11 @@ server <- function(input, output, session){
       return(div(class = "card-lite welcome",
                  h4("Welcome!"),
                  tags$ol(
-                   tags$li("Tick the plant groups that are available (or press Check All)."),
-                   tags$li("Switch on the CO\u2082 cap and edit its limit. (Optional)"),
-                   tags$li("Press ", tags$b("SOLVE"), ".")),
-                 p(class = "muted", "You will get the minimum daily cost, the output of every plant in every 4-hour block, and the price of electricity in each block. ",
-                   "The ", tags$b("Simplex Tableau"), " tab lets you see every iteration.")))
+                   tags$li("Check the plant groups that are available (or Check All)."),
+                   tags$li("Turn on optionally the CO\u2082 cap and edit the limit."),
+                   tags$li("Press ", tags$b("SOLVE"), "to start.")),
+                 p(class = "muted", "You will get the minimum daily cost, the output of every plant every 4 hours, and the price of electricity in each block. ",
+                   "The ", tags$b("Simplex Tableau"), " tab lets you see all iteration.")))
     }
     if (res$status == "invalid") return(alert_box("warn", "Invalid input", res$message))
     if (res$status == "error")   return(alert_box("bad", "Unable to solve", res$message))
