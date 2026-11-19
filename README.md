@@ -2,8 +2,6 @@
  
 An R Shiny app that finds the cheapest way to run the Luzon power plants for one day, then reads the wholesale electricity price of each 4-hour block out of the same solution. The optimization is a linear program solved with a Simplex implementation written from scratch in base R, with no LP library involved.
  
-Built by Fritz Benedict C. Cerdeña for CMSC 150 E-3L at the University of the Philippines Los Baños.
- 
 A full user manual in English and Filipino is in [`docs/150-UserManual-Cerdeña.pdf`](docs/150-UserManual-Cerdeña.pdf).
  
 ## What it does
