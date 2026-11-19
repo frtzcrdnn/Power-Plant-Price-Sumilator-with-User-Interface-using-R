@@ -1,7 +1,7 @@
-# Fritz Benedict C. Cerdeña | 2025 - 06390
+# Fritz Benedict C. Cerdeña | 2025 - 06390 | CMSC 150 E-3L
 
 # Pipeline:  primal tableau (in CSV)  ->  pick groups / CO2 toggle  ->  transpose + slack + Z
-# ->  Simplex()  ->  Z, iterations, dispatch x_gt, prices S_t / h   ->  R Shiny UI
+# ->  Simplex()  ->  Z, iterations, dispatch xgt, prices St / h   ->  R Shiny UI
 
 # NEEDS: 
 # 1) install.packages("shiny")
@@ -290,7 +290,7 @@ fmt_fixed <- function(x) formatC(ifelse(abs(x) < 1e-9, 0, x), format = "f", digi
 
 esc <- function(x) htmltools::htmlEscape(x)
 
-# ---- small HTML builders (plain tables so we control scrolling, sticky headers and highlights) ----
+# small HTML builders (plain tables, controlled scrolling, sticky headers and highlights)
 alert_box <- function(type, title, body = NULL){
   div(class = paste("alert-box", type), div(class = "alert-title", title), if (!is.null(body)) div(class = "alert-body", body))
 }
@@ -414,7 +414,7 @@ server <- function(input, output, session){
   primal <- tryCatch(read_primal_csv(CSV_PATH), error = function(e) NULL)
   rv <- reactiveValues(res = NULL)
   
-  # ---- inputs: Check All / Reset / sample test cases ----
+  # inputs: Check All / Reset / sample test cases
   observeEvent(input$check_all, updateCheckboxGroupInput(session, "groups", selected = names(GROUP_KEYS)))
   observeEvent(input$reset, {
     updateCheckboxGroupInput(session, "groups", selected = character(0))
@@ -519,7 +519,6 @@ server <- function(input, output, session){
     nr <- nrow(tab); nc <- ncol(tab); m <- res$num_constraints; n <- res$num_unknowns
     pr <- h$pivotRow; pc <- h$pivotCol
     
-    #   
     info <- if (!is.na(pr)){ 
       pe <- tab[pr, pc]
       paste0("Pivot column: <b>", esc(colnames(tab)[pc]), "</b> &nbsp;\u00b7&nbsp; ",
