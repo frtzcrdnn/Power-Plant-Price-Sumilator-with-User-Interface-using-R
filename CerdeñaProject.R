@@ -281,7 +281,7 @@ BLOCK_LABELS <- c("12\u20134 AM", "4\u20138 AM", "8 AM\u201312 NN", "12\u20134 P
 # trims trailing zeros: 7000.00 -> "7,000" ; 4540.909 -> "4,540.91"
 fmt_num <- function(x, digits = 2){
   x   <- ifelse(abs(x) < 1e-9, 0, x)
-  out <- formatC(x, format = "f", digits = digits, big.mark = ",") # 123456.789 -> 123,456.79
+  out <- formatC(x, format = "f", digits = digits, big.mark = ",") # big.mark makes 123456.789 -> 123,456.79
   out[out %in% c("-0", "")] <- "0" # rounding sometimes cause -0, turns to 0
   return(out)
 }
@@ -503,12 +503,14 @@ server <- function(input, output, session){
       uiOutput("tableau_view"))
   })
   
+  # iteration slider
   set_iter <- function(v) updateSliderInput(session, "iter", value = v)
   observeEvent(input$iter_first, set_iter(0))
   observeEvent(input$iter_prev,  set_iter(max(0, (input$iter %||% 0) - 1)))
   observeEvent(input$iter_next,  { req(rv$res$history); set_iter(min(length(rv$res$history) - 1, (input$iter %||% 0) + 1)) })
   observeEvent(input$iter_last,  { req(rv$res$history); set_iter(length(rv$res$history) - 1) })
   
+  # initial matrices
   output$tableau_view <- renderUI({
     res <- rv$res; req(!is.null(res), !is.null(res$history))
     hist <- res$history
@@ -563,9 +565,5 @@ server <- function(input, output, session){
 #                                       LAUNCH PROGRAM
 # =====================================================================================
 
-# Build the app. If the file was NOT started through shiny::runApp(), launch it right 
-
+# can launch directly using Ctrl + Shift + s
 app <- shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))
-started_by_runApp <- any(vapply(sys.calls(), function(cl) grepl("runApp|shinyAppFile", paste(deparse(cl[[1]]), collapse = "")), logical(1)))
-if (!started_by_runApp) runApp(app, launch.browser = TRUE)
-invisible(app)
